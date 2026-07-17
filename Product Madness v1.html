@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product Madness</title>
+<style>
+  :root {
+    --cream-page:#FBF3E7; --cream-surface:#FFFBF4; --pink-border:#F2C9D6;
+    --blush-1:#FFDCE8; --blush-2:#FFC9DB; --hud-text:#8A4E68; --body-text:#7E5865;
+    --rose-1:#F49FBC; --rose-2:#F2708F; --strawberry:#E9678C;
+    --action-1:#F2708F; --action-2:#E85C82; --action-shadow:#C94E71;
+    --tab-1:#F48FB1; --tab-2:#EC6F9C;
+    --blush-minor:#F9DCE6; --cream-track:#F9E4D4; --cream-chip:#FFF4E4; --chip-border:#F4AFC8;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; }
+  body { background:var(--cream-page); color:var(--body-text);
+         font-family:"Segoe UI",system-ui,sans-serif; font-size:14px; overflow:hidden; }
+  #app { display:flex; flex-direction:column; height:100%; max-width:520px; margin:0 auto; padding:10px 10px 8px; }
+
+  /* HUD */
+  #hud { display:flex; align-items:center; justify-content:space-between; gap:8px;
+         background:linear-gradient(180deg,var(--blush-1),var(--blush-2)); color:var(--hud-text);
+         border-radius:14px; padding:8px 12px; font-weight:800; flex:0 0 auto; }
+  #hud-clock { font-variant-numeric:tabular-nums; }
+  #hud-level { display:flex; align-items:center; gap:6px; min-width:0; }
+  #hud-title { font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:90px; }
+  #hud-xpbar { background:rgba(255,255,255,.85); border-radius:999px; height:8px; width:52px; overflow:hidden; }
+  #hud-xpbar i { display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--rose-1),var(--rose-2)); transition:width .3s; }
+  #hud-quests { display:flex; gap:4px; }
+  #hud-quests .pip { width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.85); display:inline-block; }
+  #hud-quests .pip.done { background:var(--rose-2); }
+
+  /* Scenes */
+  main { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+  .scene { display:none; flex:1; flex-direction:column; min-height:0; padding-top:10px; }
+  .scene.on { display:flex; }
+
+  /* Kitchen stage */
+  #stage { flex:0 0 auto; background:var(--cream-surface); border:2px solid var(--pink-border);
+           border-radius:18px; padding:16px 14px; min-height:280px; display:flex; align-items:stretch; }
+  .stage-card { display:none; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; }
+  .stage-card.on { display:flex; }
+  .stage-emoji { font-size:44px; }
+  .stage-card h2 { color:var(--hud-text); font-size:18px; font-weight:800; max-width:100%; overflow-wrap:anywhere; }
+  .lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; opacity:.65; }
+  #timer-display { font-size:56px; font-weight:900; color:var(--strawberry); font-variant-numeric:tabular-nums; line-height:1; }
+  #timer-display.overtime { color:var(--action-shadow); animation:pulse 1s infinite; }
+  #timer-display.paused { opacity:.45; }
+  @keyframes pulse { 50% { opacity:.6; } }
+  #par-bar { background:var(--cream-track); border-radius:999px; height:12px; width:85%; overflow:hidden; }
+  #par-bar i { display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--rose-1),var(--rose-2)); }
+  #run-parline { display:flex; gap:14px; font-size:12px; font-weight:700; }
+  .quip { font-size:12.5px; font-style:italic; background:var(--cream-chip); border:1.5px dashed var(--chip-border);
+          border-radius:10px; padding:6px 10px; max-width:95%; color:#A2547A; }
+  .quip:empty { display:none; }
+  .par-reveal { display:flex; align-items:baseline; gap:8px; font-weight:900; font-size:26px; color:var(--strawberry); }
+  .par-reveal .lbl { font-size:11px; }
+  .badge { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.05em;
+           background:var(--blush-minor); color:var(--hud-text); border-radius:999px; padding:2px 8px; align-self:center; }
+  .mycall { background:var(--cream-chip); border:1.5px dashed var(--chip-border); border-radius:10px;
+            padding:4px 12px; font-weight:800; color:#A2547A; }
+
+  /* Buttons */
+  button { font-family:inherit; border:none; cursor:pointer; font-weight:800; color:var(--hud-text); }
+  .btn-primary { background:linear-gradient(180deg,var(--action-1),var(--action-2)); color:#fff;
+                 border-radius:14px; padding:10px 26px; font-size:16px; box-shadow:0 3px 0 var(--action-shadow); }
+  .btn-primary:active { transform:translateY(2px); box-shadow:0 1px 0 var(--action-shadow); }
+  .btn-primary.big { font-size:20px; padding:12px 42px; }
+  .btn-minor { background:var(--blush-minor); border-radius:10px; padding:7px 16px; font-size:12px; }
+  .btn-ghost { background:transparent; font-size:12px; opacity:.7; text-decoration:underline; }
+  .row2 { display:flex; gap:8px; }
+
+  /* Call picker */
+  #call-chips { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+  #call-chips button { background:var(--blush-minor); border-radius:999px; padding:8px 14px; font-size:14px; }
+  #call-chips button.on { background:linear-gradient(180deg,var(--tab-1),var(--tab-2)); color:#fff; }
+  #call-slider { width:85%; accent-color:var(--rose-2); }
+  #call-value { font-size:22px; font-weight:900; color:var(--strawberry); font-variant-numeric:tabular-nums; }
+
+  /* Quick log + rail */
+  #quicklog-wrap { display:flex; align-items:center; gap:8px; margin-top:10px; flex:0 0 auto; }
+  #quick-log { flex:1; background:#fff; border:2px solid var(--pink-border); border-radius:12px;
+               padding:9px 12px; font-family:inherit; font-size:14px; color:var(--body-text); outline:none; }
+  #quick-log:focus { border-color:var(--rose-1); }
+  .chip { background:var(--blush-minor); color:var(--hud-text); border-radius:999px; padding:4px 10px;
+          font-size:11px; font-weight:800; white-space:nowrap; cursor:pointer; }
+  #order-rail { display:flex; gap:8px; overflow-x:auto; padding:10px 2px 4px; min-height:64px; flex:0 0 auto; }
+  .ticket { background:var(--cream-surface); border:2px solid var(--pink-border); border-radius:12px;
+            padding:6px 10px; min-width:130px; max-width:170px; flex:0 0 auto; font-size:12px; }
+  .ticket .t-title { font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ticket .t-row { display:flex; justify-content:space-between; align-items:center; margin-top:5px; gap:6px; }
+  .ticket .t-start { background:linear-gradient(180deg,var(--action-1),var(--action-2)); color:#fff;
+                     border-radius:8px; padding:3px 10px; font-size:11px; }
+  .ticket .t-del { opacity:.5; font-size:11px; background:none; }
+
+  /* Progress scene */
+  #scene-progress { overflow-y:auto; gap:8px; }
+  #scene-progress h3 { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em;
+                       opacity:.6; margin:10px 2px 4px; }
+  .prow { display:flex; justify-content:space-between; align-items:center; background:var(--cream-surface);
+          border:1.5px solid var(--pink-border); border-radius:10px; padding:7px 10px; font-size:13px; margin-bottom:5px; }
+  .qbar { background:var(--cream-track); border-radius:999px; height:6px; margin:-1px 2px 7px; overflow:hidden; }
+  .qbar i { display:block; height:100%; background:var(--rose-2); }
+  #scoreboard { text-align:center; background:linear-gradient(180deg,var(--blush-1),var(--blush-2));
+                color:var(--hud-text); border-radius:12px; padding:10px; font-weight:900; font-size:18px; }
+  .hday { font-size:11px; font-weight:800; opacity:.55; margin:8px 2px 3px; }
+
+  /* Tabs */
+  #tabs { display:flex; background:#F9E9DC; border-radius:14px; overflow:hidden; margin-top:10px; flex:0 0 auto; }
+  #tabs button { flex:1; padding:11px 0; font-size:14px; background:transparent; }
+  #tabs button.on { background:linear-gradient(180deg,var(--tab-1),var(--tab-2)); color:#fff; }
+
+  /* Toasts, banner, level-up, drawer */
+  #toasts { position:fixed; bottom:74px; left:50%; transform:translateX(-50%); display:flex;
+            flex-direction:column; gap:6px; align-items:center; z-index:40; pointer-events:none; }
+  .toast { background:var(--cream-surface); border:2px solid var(--pink-border); color:var(--body-text);
+           border-radius:999px; padding:7px 16px; font-weight:800; font-size:13px;
+           box-shadow:0 4px 12px rgba(200,130,150,.25); animation:toastin .2s; }
+  @keyframes toastin { from { transform:translateY(8px); opacity:0; } }
+  #levelup { position:fixed; inset:0; background:rgba(126,88,101,.45); display:flex;
+             align-items:center; justify-content:center; z-index:50; }
+  #levelup .card { background:var(--cream-surface); border:3px solid var(--pink-border); border-radius:20px;
+                   padding:26px 30px; text-align:center; display:flex; flex-direction:column; gap:10px; align-items:center; }
+  #levelup h2 { color:var(--strawberry); font-size:24px; }
+  #banner { position:fixed; top:0; left:0; right:0; background:linear-gradient(180deg,var(--blush-1),var(--blush-2));
+            color:var(--hud-text); padding:10px 14px; z-index:45; display:flex; gap:10px; align-items:center;
+            justify-content:center; flex-wrap:wrap; font-weight:700; font-size:13px; }
+  #settings-drawer { position:fixed; top:0; right:0; bottom:0; width:320px; max-width:92vw;
+                     background:var(--cream-surface); border-left:3px solid var(--pink-border); z-index:60;
+                     padding:18px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
+  #settings-drawer label { font-size:12px; font-weight:800; display:flex; flex-direction:column; gap:4px; }
+  #settings-drawer input[type=text], #settings-drawer input[type=password], #settings-drawer select {
+    background:#fff; border:2px solid var(--pink-border); border-radius:8px; padding:7px 9px;
+    font-family:inherit; color:var(--body-text); }
+  .drawer-note { font-size:11px; background:var(--cream-chip); border:1.5px dashed var(--chip-border);
+                 border-radius:8px; padding:7px 9px; color:#A2547A; }
+  .switchrow { display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:800; }
+  #fx { position:fixed; inset:0; pointer-events:none; z-index:70; }
+  [hidden] { display:none !important; }
+
+  /* Selftest page */
+  #selftest { padding:20px; font-family:Consolas,monospace; background:#fff; color:#333;
+              position:fixed; inset:0; overflow:auto; z-index:100; }
+  #selftest h1 { font-size:16px; margin-bottom:10px; }
+  #selftest li.pass { color:#7E5865; }
+  #selftest li.fail { color:#C94E71; font-weight:bold; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <div id="hud-clock">--:--</div>
+    <div id="hud-level"><span id="hud-title">Dishwasher</span><span id="hud-lv">Lv 1</span>
+      <span id="hud-xpbar"><i id="hud-xpfill"></i></span></div>
+    <div id="hud-stars">★ 0</div>
+    <div id="hud-quests"><i class="pip"></i><i class="pip"></i><i class="pip"></i></div>
+  </header>
+  <main>
+    <section id="scene-kitchen" class="scene on">
+      <div id="stage">
+        <div id="stage-idle" class="stage-card on">
+          <div class="stage-emoji">🍓</div>
+          <h2>Order up?</h2>
+          <p class="lbl">log a task below to start the rush</p>
+        </div>
+        <div id="stage-call" class="stage-card">
+          <h2 id="call-title"></h2>
+          <p class="lbl">lock your call - how long will this take you?</p>
+          <div id="call-chips"></div>
+          <input id="call-slider" type="range" min="30" max="600" step="15" value="180">
+          <div id="call-value">3:00</div>
+          <button id="btn-lock" class="btn-primary">Lock my call</button>
+          <button id="btn-cancel-call" class="btn-ghost">send to rail instead</button>
+        </div>
+        <div id="stage-ready" class="stage-card">
+          <h2 id="ready-title"></h2>
+          <div id="ready-quip" class="quip"></div>
+          <div class="par-reveal"><span class="lbl">AI par</span><span id="ready-par">-:--</span><span id="ready-par-src" class="badge">local</span></div>
+          <div class="mycall">🥊 my call: <span id="ready-call">-:--</span></div>
+          <button id="btn-start" class="btn-primary big">▶ Start</button>
+        </div>
+        <div id="stage-run" class="stage-card">
+          <h2 id="run-title"></h2>
+          <div id="timer-display">0:00</div>
+          <div id="par-bar"><i id="par-fill"></i></div>
+          <div id="run-parline"><span id="run-par"></span><span id="run-call"></span></div>
+          <button id="btn-done" class="btn-primary big">✔ DONE</button>
+          <div class="row2">
+            <button id="btn-pause" class="btn-minor">⏸ pause</button>
+            <button id="btn-drop" class="btn-minor">✕ drop</button>
+          </div>
+        </div>
+      </div>
+      <div id="quicklog-wrap">
+        <input id="quick-log" placeholder="+ log a task and press Enter" maxlength="80">
+        <span id="quick-cat" class="chip" hidden></span>
+      </div>
+      <div id="order-rail"></div>
+    </section>
+    <section id="scene-progress" class="scene">
+      <h3>Daily quests</h3><div id="quest-list"></div>
+      <h3>You vs AI - this week</h3><div id="scoreboard"></div>
+      <h3>Your records</h3><div id="records"></div>
+      <h3>History</h3><div id="history"></div>
+      <button id="settings-open" class="btn-ghost">⚙ settings</button>
+    </section>
+  </main>
+  <nav id="tabs">
+    <button id="tab-kitchen" class="on">🍳 Kitchen</button>
+    <button id="tab-progress">📈 Progress</button>
+  </nav>
+  <div id="toasts"></div>
+  <div id="levelup" hidden><div class="card"><div class="stage-emoji">🎉</div><h2 id="levelup-title"></h2><p id="levelup-sub"></p><button id="levelup-ok" class="btn-primary">Back to the pass</button></div></div>
+  <div id="banner" hidden><p id="banner-msg"></p><span id="banner-actions"></span></div>
+  <aside id="settings-drawer" hidden>
+    <h3 style="color:var(--hud-text)">Settings</h3>
+    <div class="switchrow"><span>Sound</span><input id="set-sound" type="checkbox" checked></div>
+    <div class="switchrow"><span>Claude API estimates</span><input id="set-api-enabled" type="checkbox"></div>
+    <label>Anthropic API key<input id="set-api-key" type="password" placeholder="sk-ant-..."></label>
+    <label>Model<select id="set-model">
+      <option value="claude-haiku-4-5">claude-haiku-4-5 (fast, cheap)</option>
+      <option value="claude-sonnet-5">claude-sonnet-5 (sharper)</option>
+    </select></label>
+    <p class="drawer-note">Privacy: when the API is on, task titles are sent to Anthropic to estimate par. Keep member names and PHI out of task titles. The key stays in this browser only and is never included in exports.</p>
+    <button id="btn-export" class="btn-minor">⬇ Export data (JSON)</button>
+    <label class="btn-minor" style="text-align:center">⬆ Import data<input id="file-import" type="file" accept=".json" hidden></label>
+    <button id="btn-reset" class="btn-minor">Reset everything</button>
+    <h3 style="color:var(--hud-text)">Categories</h3>
+    <div id="cat-editor"></div>
+    <button id="settings-close" class="btn-ghost">close</button>
+  </aside>
+  <canvas id="fx"></canvas>
+</div>
+<script>
+// ===== Utils =====
+const U = {
+  pad2: n => String(n).padStart(2, '0'),
+  mmss(sec) { sec = Math.max(0, Math.round(sec)); return `${Math.floor(sec / 60)}:${U.pad2(sec % 60)}`; },
+  round5: s => Math.round(s / 5) * 5,
+  clamp: (v, lo, hi) => Math.min(hi, Math.max(lo, v)),
+  median(a) { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : 0; },
+  uid: () => 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+  esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); },
+};
+
+// ===== Rules =====
+
+// ===== Estimator =====
+
+// ===== Quests =====
+
+// ===== Store =====
+
+// ===== ApiClient =====
+
+// ===== Sfx =====
+
+// ===== Fx =====
+
+// ===== UI =====
+
+// ===== SelfTest =====
+const SelfTest = {
+  results: [], suites: [],
+  suite(fn) { SelfTest.suites.push(fn); },
+  eq(name, got, want) { const pass = JSON.stringify(got) === JSON.stringify(want); SelfTest.results.push({ name, pass, got, want }); },
+  ok(name, cond) { SelfTest.results.push({ name, pass: !!cond, got: cond, want: true }); },
+  async render() {
+    SelfTest.results = [];
+    for (const fn of SelfTest.suites) {
+      try { await fn(); }
+      catch (e) { SelfTest.results.push({ name: 'suite threw: ' + e.message, pass: false, got: String(e), want: 'no throw' }); }
+    }
+    const fails = SelfTest.results.filter(r => !r.pass);
+    document.body.innerHTML = `<div id="selftest"><h1>SELFTEST: ${SelfTest.results.length - fails.length} passed, ${fails.length} failed</h1><ol>` +
+      SelfTest.results.map(r => `<li class="${r.pass ? 'pass' : 'fail'}">${U.esc(r.name)}${r.pass ? '' : ` - got ${U.esc(JSON.stringify(r.got))}, want ${U.esc(JSON.stringify(r.want))}`}</li>`).join('') + '</ol></div>';
+  },
+};
+
+SelfTest.suite(() => {
+  SelfTest.eq('utils: mmss formats 150s', U.mmss(150), '2:30');
+  SelfTest.eq('utils: median even count', U.median([10, 20, 30, 40]), 25);
+  SelfTest.eq('utils: round5', U.round5(133), 135);
+  SelfTest.eq('utils: clamp', U.clamp(9999, 30, 1200), 1200);
+});
+
+// ===== Boot =====
+(async () => {
+  if (location.search.includes('selftest')) { await SelfTest.render(); }
+  else if (typeof UI !== 'undefined') { UI.boot(); }
+})();
+</script>
+</body>
+</html>
