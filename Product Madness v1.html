@@ -749,6 +749,7 @@ const UI = {
   },
 
   finishTask(task) {
+    if (task.state !== 'running' && task.state !== 'paused') return;
     const nowD = new Date();
     Store.ensureDay(nowD); Store.ensureWeek(nowD);
     const dk = Rules.dayKey(nowD);
@@ -776,7 +777,7 @@ const UI = {
       { stars: task.stars, showdownWin: win, combo, hour: nowD.getHours(), categoriesToday: todayCats.size, fromRail: task.fromRail });
     for (const q of newlyDone) { p.xp += q.rewardXp; UI.toast('🏆 quest: ' + q.label + ' +' + q.rewardXp + ' XP'); }
     p.level = Rules.levelForXp(p.xp);
-    Store.save();
+    if (!Store.save()) UI.toast('⚠ storage full - export your data from settings');
     const starTxt = task.stars > 0 ? '★'.repeat(task.stars) : 'overtime';
     if (task.stars > 0) Sfx.star(task.stars); else Sfx.womp();
     if (task.stars === 3) Fx.burst(50);
