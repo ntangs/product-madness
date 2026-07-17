@@ -118,7 +118,7 @@
             flex-direction:column; gap:6px; align-items:center; z-index:40; pointer-events:none; }
   .toast { background:var(--cream-surface); border:2px solid var(--pink-border); color:var(--body-text);
            border-radius:999px; padding:7px 16px; font-weight:800; font-size:13px;
-           box-shadow:0 4px 12px rgba(200,130,150,.25); animation:toastin .2s; }
+           box-shadow:0 4px 12px rgba(162,84,122,.22); animation:toastin .2s; }
   @keyframes toastin { from { transform:translateY(8px); opacity:0; } }
   #levelup { position:fixed; inset:0; background:rgba(126,88,101,.45); display:flex;
              align-items:center; justify-content:center; z-index:50; }
@@ -181,6 +181,7 @@
           <div class="par-reveal"><span class="lbl">AI par</span><span id="ready-par">-:--</span><span id="ready-par-src" class="badge">local</span></div>
           <div class="mycall">🥊 my call: <span id="ready-call">-:--</span></div>
           <button id="btn-start" class="btn-primary big">▶ Start</button>
+          <button id="btn-cancel-ready" class="btn-ghost">send to rail instead</button>
         </div>
         <div id="stage-run" class="stage-card">
           <h2 id="run-title"></h2>
@@ -196,7 +197,7 @@
       </div>
       <div id="quicklog-wrap">
         <input id="quick-log" placeholder="+ log a task and press Enter" maxlength="80">
-        <span id="quick-cat" class="chip" hidden></span>
+        <span id="quick-cat" class="chip" hidden title="tap to change category"></span>
       </div>
       <div id="order-rail"></div>
     </section>
@@ -407,6 +408,7 @@ const Store = {
     catch (e) { corrupt = true; }
     if (s && s.version !== 1) { corrupt = true; s = null; }
     if (!s) {
+      if (corrupt && raw !== null) { try { storage.setItem(Store.KEY + '.corrupt', raw); } catch (e) {} }
       Store.state = Store.defaults(nowDate);
       if (!corrupt && raw === null) Store.save();
       return { corrupt, raw };
@@ -442,7 +444,7 @@ const Store = {
   importJson(text) {
     let s;
     try { s = JSON.parse(text); } catch (e) { return false; }
-    if (!s || s.version !== 1 || !s.player || !Array.isArray(s.tasks) || !s.categories || !s.quests || !s.settings) return false;
+    if (!s || s.version !== 1 || !s.player || typeof s.player.xp !== 'number' || !Array.isArray(s.tasks) || !s.categories || !s.quests || !Array.isArray(s.quests.items) || !s.settings) return false;
     s.settings.apiKey = (Store.state && Store.state.settings.apiKey) || '';
     Store.state = s;
     Store.save();
@@ -586,7 +588,7 @@ const UI = {
       e.target.value = '';
       const task = UI.addTask(title);
       const busy = UI.flow.stage !== 'idle';
-      if (busy) { UI.toast('🎟 ticket on the rail'); UI.renderRail(); }
+      if (busy) { UI.toast('🎟 ticket on the rail'); UI.renderRail(); UI.el('quick-cat').hidden = true; }
       else UI.enterCall(task);
     });
     UI.el('quick-log').addEventListener('input', e => {
@@ -597,9 +599,23 @@ const UI = {
       chip.textContent = cat.emoji + ' ' + cat.label;
       chip.hidden = false;
     });
+    UI.el('quick-cat').addEventListener('click', () => {
+      if (UI.flow.stage !== 'call') return;
+      const task = UI.task(); if (!task) return;
+      const ids = Object.entries(Store.state.categories).filter(([, c]) => !c.archived).map(([id]) => id);
+      task.category = ids[(ids.indexOf(task.category) + 1) % ids.length];
+      Store.save();
+      UI.syncCatChip(task);
+    });
     UI.el('btn-lock').addEventListener('click', UI.lockCall);
     UI.el('btn-cancel-call').addEventListener('click', () => {
       UI.flow = { stage: 'idle', taskId: null };
+      UI.el('quick-cat').hidden = true;
+      UI.renderStage(); UI.renderRail();
+    });
+    UI.el('btn-cancel-ready').addEventListener('click', () => {
+      UI.flow = { stage: 'idle', taskId: null };
+      UI.el('quick-cat').hidden = true;
       UI.renderStage(); UI.renderRail();
     });
     UI.el('btn-start').addEventListener('click', () => {
@@ -673,6 +689,7 @@ const UI = {
   enterCall(task) {
     UI.flow = { stage: 'call', taskId: task.id };
     UI.el('call-title').textContent = task.title;
+    UI.syncCatChip(task);
     const chips = UI.el('call-chips');
     chips.innerHTML = '';
     [60, 120, 180, 240, 300].forEach(sec => {
@@ -692,6 +709,12 @@ const UI = {
     document.querySelectorAll('#call-chips button').forEach(b =>
       b.classList.toggle('on', Number(b.dataset.sec) === sec));
   },
+  syncCatChip(task) {
+    const chip = UI.el('quick-cat');
+    const cat = Store.state.categories[task.category];
+    chip.textContent = cat.emoji + ' ' + cat.label;
+    chip.hidden = false;
+  },
   async lockCall() {
     const task = UI.task(); if (!task) return;
     task.myCallSec = UI._callSec;
@@ -705,6 +728,10 @@ const UI = {
     task.parSec = Estimator.localPar(cat);
     task.parSource = 'local';
     task.quip = '';
+    UI.el('ready-title').textContent = task.title;
+    UI.el('ready-call').textContent = U.mmss(task.myCallSec);
+    UI.el('ready-quip').textContent = '';
+    UI.el('ready-par-src').textContent = 'local';
     const s = Store.state.settings;
     if (s.apiEnabled && s.apiKey) {
       UI.el('ready-par').textContent = '…';
@@ -716,15 +743,17 @@ const UI = {
       if (api && task.state === 'queued') { task.parSec = api.seconds; task.parSource = 'api'; task.quip = api.quip; }
       else if (!api && ApiClient.failStreak >= 3) UI.toast('Claude is napping - local pars for now');
     }
-    UI.el('ready-title').textContent = task.title;
     UI.el('ready-par').textContent = U.mmss(task.parSec);
     UI.el('ready-par-src').textContent = task.parSource === 'api' ? 'Claude' : 'local';
-    UI.el('ready-call').textContent = U.mmss(task.myCallSec);
     UI.el('ready-quip').textContent = task.quip;
   },
 
   // --- running ---
   beginRun(task, fromRail = false) {
+    for (const o of Store.state.tasks) {
+      if (o.id !== task.id && (o.state === 'running' || o.state === 'paused')) { o.state = 'dropped'; o.finishedAt = UI.now(); }
+    }
+    UI.banner(null);
     task.state = 'running';
     task.startedAt = UI.now();
     task.fromRail = task.fromRail || fromRail;
@@ -775,7 +804,7 @@ const UI = {
       .map(t => t.category));
     const newlyDone = Quests.applyFinish(Store.state.quests.items,
       { stars: task.stars, showdownWin: win, combo, hour: nowD.getHours(), categoriesToday: todayCats.size, fromRail: task.fromRail });
-    for (const q of newlyDone) { p.xp += q.rewardXp; UI.toast('🏆 quest: ' + q.label + ' +' + q.rewardXp + ' XP'); }
+    for (const q of newlyDone) { p.xp += q.rewardXp; UI.toast('🏆 quest: ' + q.label + ' +' + q.rewardXp + ' XP'); Sfx.ding(); }
     p.level = Rules.levelForXp(p.xp);
     if (!Store.save()) UI.toast('⚠ storage full - export your data from settings');
     const starTxt = task.stars > 0 ? '★'.repeat(task.stars) : 'overtime';
@@ -787,6 +816,7 @@ const UI = {
     if (flavor) UI.toast(flavor);
     if (p.level > beforeLevel) UI.onLevelUp(p.level);
     UI.flow = { stage: 'idle', taskId: null };
+    UI.el('quick-cat').hidden = true;
     UI.renderAll();
   },
 
@@ -797,6 +827,7 @@ const UI = {
     Store.save();
     UI.toast('✕ dropped - no harm done');
     UI.flow = { stage: 'idle', taskId: null };
+    UI.el('quick-cat').hidden = true;
     UI.renderAll();
   },
 
@@ -837,14 +868,15 @@ const UI = {
       const tk = document.createElement('div');
       tk.className = 'ticket';
       tk.innerHTML = `<div class="t-title">${U.esc(t.title)}</div>
-        <div class="t-row"><span class="chip">${cat.emoji} ${U.esc(cat.label)}</span>
+        <div class="t-row"><span class="chip">${U.esc(cat.emoji)} ${U.esc(cat.label)}</span>
         <button class="t-start">▶</button><button class="t-del">✕</button></div>`;
       tk.querySelector('.t-start').addEventListener('click', () => {
         if (UI.flow.stage !== 'idle') { UI.toast('finish the current task first'); return; }
         UI.startTask(t, true);
       });
       tk.querySelector('.t-del').addEventListener('click', () => {
-        t.state = 'dropped'; t.finishedAt = UI.now(); Store.save(); UI.renderRail();
+        Store.state.tasks = Store.state.tasks.filter(x => x.id !== t.id);
+        Store.save(); UI.renderRail();
       });
       rail.appendChild(tk);
     }
@@ -905,7 +937,7 @@ const UI = {
     for (const r of UI.categoryRecords()) {
       const row = document.createElement('div');
       row.className = 'prow';
-      row.innerHTML = `<span>${r.emoji} ${U.esc(r.label)}</span><b>~${U.mmss(r.median)} · best ${U.mmss(r.best)} · x${r.count}</b>`;
+      row.innerHTML = `<span>${U.esc(r.emoji)} ${U.esc(r.label)}</span><b>~${U.mmss(r.median)} · best ${U.mmss(r.best)} · x${r.count}</b>`;
       rc.appendChild(row);
     }
     const hist = UI.el('history');
@@ -932,7 +964,6 @@ const UI = {
     }
   },
   finishFlavor(task) {
-    if (task.quip && task.parSource === 'api') return '';
     const win = ['Called it. The kitchen fears you.', 'Chef things. Keep moving.', 'That ticket never stood a chance.'];
     const lose = ['The AI smirks quietly.', 'Par stands. Next order.', 'Recalibrating your legend...'];
     const pool = task.showdownWin ? win : lose;
@@ -956,7 +987,7 @@ const UI = {
     ]);
   },
   showCorrupt(raw) {
-    UI.banner('Saved data could not be read. Export what is recoverable, then reset.', [
+    UI.banner('Saved data could not be read. A copy was kept under product-madness.v1.corrupt - download it, then reset.', [
       ['Download raw', () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([raw || ''], { type: 'application/json' })); a.download = 'product-madness-recovered.json'; a.click(); }],
       ['Reset', () => { Store.save(); UI.banner(null); UI.renderAll(); }],
     ]);
@@ -994,9 +1025,9 @@ const UI = {
       const row = document.createElement('div');
       row.className = 'prow';
       row.style.flexWrap = 'wrap';
-      row.innerHTML = `<b>${c.emoji}</b>
+      row.innerHTML = `<b>${U.esc(c.emoji)}</b>
         <input data-f="label" value="${U.esc(c.label)}" style="width:34%">
-        <input data-f="baselineSec" type="number" min="30" max="1200" value="${c.baselineSec}" style="width:18%" title="baseline seconds">
+        <input data-f="baselineSec" type="number" min="30" max="1200" value="${Number(c.baselineSec) || 180}" style="width:18%" title="baseline seconds">
         <input data-f="keywords" value="${U.esc(c.keywords.join(', '))}" style="width:100%;margin-top:4px" placeholder="keywords, comma separated">
         <label style="display:flex;flex-direction:row;gap:4px;font-size:11px;align-items:center">archived <input data-f="archived" type="checkbox" ${c.archived ? 'checked' : ''}></label>`;
       row.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
@@ -1090,6 +1121,7 @@ SelfTest.suite(() => {
   SelfTest.eq('par: 1 sample blends', Estimator.localPar(cat(180, [60])), 140);
   SelfTest.eq('par: 2 samples blend', Estimator.localPar(cat(180, [60, 90])), 110);
   SelfTest.eq('par: 3 samples use median', Estimator.localPar(cat(180, [100, 200, 300])), 200);
+  SelfTest.eq('par: median not mean on skewed samples', Estimator.localPar(cat(180, [100, 110, 300])), 110);
   SelfTest.eq('par: 6+ samples use last five', Estimator.localPar(cat(180, [600, 100, 100, 100, 100, 100])), 100);
   SelfTest.eq('par: rounds to 5s', Estimator.localPar(cat(133, [])), 135);
   SelfTest.eq('par: clamps low', Estimator.localPar(cat(180, [5, 5, 5])), 30);
