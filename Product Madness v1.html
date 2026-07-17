@@ -451,6 +451,61 @@ const Store = {
 };
 
 // ===== ApiClient =====
+const PM_PROFILE = 'The player is a senior product manager and business analyst at a healthcare technology company. Typical micro-tasks: replying to stakeholder emails and Teams messages, writing and grooming Jira tickets, editing HTML wireframes and mockups, cleaning up meeting notes, prepping agendas, and quick data checks in reports. They work fast and take pride in accurate estimates.';
+
+function SYSTEM_PROMPT(cat) {
+  const med = cat.samples.length ? U.median(cat.samples.slice(-5)) + 's' : 'n/a';
+  return `You estimate how long the player's next micro-task will take, in seconds. You are their playful arcade rival: confident, teasing, never mean. ${PM_PROFILE}\nCategory "${cat.label}": baseline ${cat.baselineSec}s, ${cat.samples.length} recorded samples, recent median ${med}.\nRespond with ONLY a JSON object, no other text: {"seconds": <integer between 30 and 1200>, "quip": "<max 90 characters of playful trash talk about this estimate>"}`;
+}
+
+function USER_PROMPT(title, historyLines) {
+  return `Task: "${title}"\nRecent similar tasks (actual times):\n${historyLines.length ? historyLines.join('\n') : '(none yet)'}`;
+}
+
+const ApiClient = {
+  cache: {},
+  failStreak: 0,
+  async par(title, cat, historyLines, settings, dayKey, fetchFn = fetch) {
+    const ck = dayKey + '|' + title.toLowerCase();
+    if (ApiClient.cache[ck]) return ApiClient.cache[ck];
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3500);
+    try {
+      const res = await fetchFn('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: {
+          'x-api-key': settings.apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: settings.model, max_tokens: 150,
+          system: SYSTEM_PROMPT(cat),
+          messages: [{ role: 'user', content: USER_PROMPT(title, historyLines) }],
+        }),
+      });
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      const text = (data.content || []).map(b => b.text || '').join('');
+      const m = text.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error('no json');
+      const obj = JSON.parse(m[0]);
+      const seconds = Math.round(obj.seconds);
+      if (!Number.isFinite(seconds) || seconds < 30 || seconds > 1200) throw new Error('bad seconds');
+      const out = { seconds, quip: String(obj.quip || '').slice(0, 90) };
+      ApiClient.failStreak = 0;
+      ApiClient.cache[ck] = out;
+      return out;
+    } catch (e) {
+      ApiClient.failStreak++;
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+};
 
 // ===== Sfx =====
 const Sfx = {
@@ -557,6 +612,47 @@ const UI = {
     UI.el('levelup-ok').addEventListener('click', () => { UI.el('levelup').hidden = true; });
     UI.el('tab-kitchen').addEventListener('click', () => UI.switchTab('kitchen'));
     UI.el('tab-progress').addEventListener('click', () => UI.switchTab('progress'));
+    UI.el('settings-open').addEventListener('click', () => {
+      const s = Store.state.settings;
+      UI.el('set-sound').checked = s.sound;
+      UI.el('set-api-enabled').checked = s.apiEnabled;
+      UI.el('set-api-key').value = s.apiKey;
+      UI.el('set-model').value = s.model;
+      UI.el('settings-drawer').hidden = false;
+      UI.renderCatEditor();
+    });
+    UI.el('settings-close').addEventListener('click', () => { UI.el('settings-drawer').hidden = true; });
+    UI.el('set-sound').addEventListener('change', e => { Store.state.settings.sound = e.target.checked; Store.save(); });
+    UI.el('set-api-enabled').addEventListener('change', e => { Store.state.settings.apiEnabled = e.target.checked; Store.save(); });
+    UI.el('set-api-key').addEventListener('change', e => { Store.state.settings.apiKey = e.target.value.trim(); Store.save(); });
+    UI.el('set-model').addEventListener('change', e => { Store.state.settings.model = e.target.value; Store.save(); });
+    UI.el('btn-export').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([Store.exportJson()], { type: 'application/json' }));
+      const d = new Date();
+      a.download = `product-madness-export-${d.getFullYear()}${U.pad2(d.getMonth() + 1)}${U.pad2(d.getDate())}.json`;
+      a.click();
+      Store.state.settings.lastExportAt = UI.now(); Store.save();
+      UI.toast('⬇ exported');
+    });
+    UI.el('file-import').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const ok = Store.importJson(await file.text());
+      UI.toast(ok ? '⬆ imported' : 'import failed - file rejected');
+      if (ok) { UI.el('settings-drawer').hidden = true; UI.renderAll(); }
+      e.target.value = '';
+    });
+    UI.el('btn-reset').addEventListener('click', () => {
+      if (!confirm('Reset ALL Product Madness data?')) return;
+      if (!confirm('Really? Levels, history, records - everything?')) return;
+      Store.state = Store.defaults(new Date());
+      Store.save();
+      UI.el('settings-drawer').hidden = true;
+      UI.flow = { stage: 'idle', taskId: null };
+      UI.renderAll();
+      UI.toast('fresh kitchen');
+    });
   },
 
   task() { return Store.state.tasks.find(t => t.id === UI.flow.taskId) || null; },
@@ -609,9 +705,20 @@ const UI = {
     task.parSec = Estimator.localPar(cat);
     task.parSource = 'local';
     task.quip = '';
+    const s = Store.state.settings;
+    if (s.apiEnabled && s.apiKey) {
+      UI.el('ready-par').textContent = '…';
+      const historyLines = Store.state.tasks
+        .filter(t => t.state === 'done' && t.category === task.category)
+        .slice(-10)
+        .map(t => `${t.title} - ${U.mmss(t.actualSec)}`);
+      const api = await ApiClient.par(task.title, cat, historyLines, s, Rules.dayKey(new Date()));
+      if (api && task.state === 'queued') { task.parSec = api.seconds; task.parSource = 'api'; task.quip = api.quip; }
+      else if (!api && ApiClient.failStreak >= 3) UI.toast('Claude is napping - local pars for now');
+    }
     UI.el('ready-title').textContent = task.title;
     UI.el('ready-par').textContent = U.mmss(task.parSec);
-    UI.el('ready-par-src').textContent = task.parSource;
+    UI.el('ready-par-src').textContent = task.parSource === 'api' ? 'Claude' : 'local';
     UI.el('ready-call').textContent = U.mmss(task.myCallSec);
     UI.el('ready-quip').textContent = task.quip;
   },
@@ -878,6 +985,43 @@ const UI = {
     const changed = Store.ensureDay(nowD) | Store.ensureWeek(nowD);
     if (changed) { Store.save(); UI.renderAll(); }
   },
+
+  renderCatEditor() {
+    const box = UI.el('cat-editor');
+    box.innerHTML = '';
+    for (const [id, c] of Object.entries(Store.state.categories)) {
+      const row = document.createElement('div');
+      row.className = 'prow';
+      row.style.flexWrap = 'wrap';
+      row.innerHTML = `<b>${c.emoji}</b>
+        <input data-f="label" value="${U.esc(c.label)}" style="width:34%">
+        <input data-f="baselineSec" type="number" min="30" max="1200" value="${c.baselineSec}" style="width:18%" title="baseline seconds">
+        <input data-f="keywords" value="${U.esc(c.keywords.join(', '))}" style="width:100%;margin-top:4px" placeholder="keywords, comma separated">
+        <label style="display:flex;flex-direction:row;gap:4px;font-size:11px;align-items:center">archived <input data-f="archived" type="checkbox" ${c.archived ? 'checked' : ''}></label>`;
+      row.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
+        const f = inp.dataset.f;
+        if (f === 'label') c.label = inp.value.trim() || c.label;
+        if (f === 'baselineSec') c.baselineSec = U.clamp(Number(inp.value) || c.baselineSec, 30, 1200);
+        if (f === 'keywords') c.keywords = inp.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        if (f === 'archived') c.archived = inp.checked;
+        Store.save();
+      }));
+      box.appendChild(row);
+    }
+    const add = document.createElement('button');
+    add.className = 'btn-minor';
+    add.textContent = '+ add category';
+    add.addEventListener('click', () => {
+      const label = prompt('Category name?');
+      if (!label) return;
+      const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'cat-' + Date.now();
+      if (Store.state.categories[id]) { UI.toast('that category exists'); return; }
+      Store.state.categories[id] = { label, emoji: '🍓', keywords: [], baselineSec: 180, samples: [], archived: false };
+      Store.save();
+      UI.renderCatEditor();
+    });
+    box.appendChild(add);
+  },
 };
 
 // ===== SelfTest =====
@@ -1019,6 +1163,26 @@ SelfTest.suite(() => {
   SelfTest.eq('records: only sampled categories', rec.length, 2);
   SelfTest.eq('records: sorted by count desc', rec[0].id, 'email-reply');
   SelfTest.eq('records: median/best/count', [rec[0].median, rec[0].best, rec[0].count], [200, 100, 3]);
+});
+
+SelfTest.suite(async () => {
+  const settings = { apiKey: 'k', apiEnabled: true, model: 'claude-haiku-4-5' };
+  const cat = { label: 'Email reply', baselineSec: 180, samples: [120, 150] };
+  const okFetch = async () => ({ ok: true, json: async () => ({ content: [{ type: 'text', text: 'Here: {"seconds":240,"quip":"Easy money."}' }] }) });
+  ApiClient.cache = {}; ApiClient.failStreak = 0;
+  const good = await ApiClient.par('reply to Bob', cat, [], settings, '2026-07-16', okFetch);
+  SelfTest.eq('api: parses seconds and quip', [good.seconds, good.quip], [240, 'Easy money.']);
+  const badRange = async () => ({ ok: true, json: async () => ({ content: [{ type: 'text', text: '{"seconds":99999,"quip":"x"}' }] }) });
+  SelfTest.eq('api: out-of-range seconds rejected', await ApiClient.par('t2', cat, [], settings, '2026-07-16', badRange), null);
+  const garbage = async () => ({ ok: true, json: async () => ({ content: [{ type: 'text', text: 'no json here' }] }) });
+  SelfTest.eq('api: garbage rejected', await ApiClient.par('t3', cat, [], settings, '2026-07-16', garbage), null);
+  const httpErr = async () => ({ ok: false, status: 401, json: async () => ({}) });
+  SelfTest.eq('api: http error rejected', await ApiClient.par('t4', cat, [], settings, '2026-07-16', httpErr), null);
+  SelfTest.eq('api: failStreak counted', ApiClient.failStreak, 3);
+  const throwFetch = async () => { throw new Error('offline'); };
+  const cached = await ApiClient.par('reply to Bob', cat, [], settings, '2026-07-16', throwFetch);
+  SelfTest.eq('api: same-day cache hit skips fetch', cached.seconds, 240);
+  SelfTest.ok('api: quip capped at 90 chars', (await (async () => { const long = async () => ({ ok: true, json: async () => ({ content: [{ type: 'text', text: `{"seconds":120,"quip":"${'x'.repeat(200)}"}` }] }) }); return ApiClient.par('t5', cat, [], settings, '2026-07-16', long); })()).quip.length === 90);
 });
 
 // ===== Boot =====
