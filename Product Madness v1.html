@@ -332,6 +332,58 @@ const Estimator = {
 
 // ===== Quests =====
 
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const QUEST_TEMPLATES = [
+  { id: 1, label: 'Clear 5 tasks', target: 5, rewardXp: 40 },
+  { id: 2, label: 'Earn 6 stars', target: 6, rewardXp: 40 },
+  { id: 3, label: 'Beat the AI in 2 showdowns', target: 2, rewardXp: 45 },
+  { id: 4, label: 'Reach a 3-combo', target: 3, rewardXp: 45 },
+  { id: 5, label: 'Score a 3-star finish before noon', target: 1, rewardXp: 50 },
+  { id: 6, label: 'Finish tasks in 3 categories', target: 3, rewardXp: 40 },
+  { id: 7, label: 'Clear 3 rail tickets, no drops', target: 3, rewardXp: 45 },
+  { id: 8, label: '5 starred finishes in a row', target: 5, rewardXp: 60 },
+];
+
+const Quests = {
+  forDate(dayKey) {
+    const rnd = mulberry32(Number(dayKey.replaceAll('-', '')));
+    const pool = [...QUEST_TEMPLATES];
+    const picked = [];
+    while (picked.length < 3) picked.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]);
+    return picked.map(t => ({ templateId: t.id, label: t.label, target: t.target, rewardXp: t.rewardXp, progress: 0, done: false }));
+  },
+  applyFinish(items, ctx) {
+    const newlyDone = [];
+    for (const q of items) {
+      if (q.done) continue;
+      switch (q.templateId) {
+        case 1: q.progress++; break;
+        case 2: q.progress = Math.min(q.target, q.progress + ctx.stars); break;
+        case 3: if (ctx.showdownWin) q.progress++; break;
+        case 4: q.progress = Math.max(q.progress, ctx.combo); break;
+        case 5: if (ctx.stars === 3 && ctx.hour < 12) q.progress = 1; break;
+        case 6: q.progress = Math.min(q.target, ctx.categoriesToday); break;
+        case 7: if (ctx.fromRail) q.progress++; break;
+        case 8: q.progress = ctx.stars > 0 ? q.progress + 1 : 0; break;
+      }
+      if (q.progress >= q.target) { q.done = true; newlyDone.push(q); }
+    }
+    return newlyDone;
+  },
+  applyDrop(items) {
+    for (const q of items) if (!q.done && (q.templateId === 7 || q.templateId === 8)) q.progress = 0;
+  },
+};
+
 // ===== Store =====
 
 // ===== ApiClient =====
@@ -413,6 +465,30 @@ SelfTest.suite(() => {
   SelfTest.eq('par: clamps high', Estimator.localPar(cat(180, [4000, 4000, 4000])), 1200);
   SelfTest.ok('seed: 15 categories', Object.keys(SEED_CATEGORIES).length === 15);
   SelfTest.ok('seed: other has no keywords', SEED_CATEGORIES.other.keywords.length === 0);
+});
+
+SelfTest.suite(() => {
+  const a = Quests.forDate('2026-07-16'), b = Quests.forDate('2026-07-16');
+  SelfTest.eq('quests: deterministic per date', a, b);
+  SelfTest.ok('quests: three distinct templates', new Set(a.map(q => q.templateId)).size === 3);
+  SelfTest.ok('quests: different date differs', JSON.stringify(Quests.forDate('2026-07-17')) !== JSON.stringify(a));
+  const items = [
+    { templateId: 1, label: 'Clear 5 tasks', target: 5, rewardXp: 40, progress: 4, done: false },
+    { templateId: 3, label: 'Beat the AI in 2 showdowns', target: 2, rewardXp: 45, progress: 1, done: false },
+    { templateId: 5, label: 'Score a 3-star finish before noon', target: 1, rewardXp: 50, progress: 0, done: false },
+    { templateId: 8, label: '5 starred finishes in a row', target: 5, rewardXp: 60, progress: 3, done: false },
+  ];
+  const newlyDone = Quests.applyFinish(items, { stars: 3, showdownWin: true, combo: 2, hour: 10, categoriesToday: 2, fromRail: false });
+  SelfTest.eq('quests: task count completes', items[0].done, true);
+  SelfTest.eq('quests: showdown completes', items[1].done, true);
+  SelfTest.eq('quests: 3-star before noon completes', items[2].done, true);
+  SelfTest.eq('quests: streak advances', items[3].progress, 4);
+  SelfTest.eq('quests: newlyDone lists three', newlyDone.length, 3);
+  Quests.applyFinish(items, { stars: 0, showdownWin: false, combo: 0, hour: 14, categoriesToday: 2, fromRail: false });
+  SelfTest.eq('quests: unstarred finish resets streak', items[3].progress, 0);
+  const railItems = [{ templateId: 7, label: 'Clear 3 rail tickets, no drops', target: 3, rewardXp: 45, progress: 2, done: false }];
+  Quests.applyDrop(railItems);
+  SelfTest.eq('quests: drop resets rail quest', railItems[0].progress, 0);
 });
 
 // ===== Boot =====
