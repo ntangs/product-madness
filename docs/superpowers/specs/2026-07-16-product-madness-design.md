@@ -211,6 +211,8 @@ Strawberries & Cream palette (locked in `design-mockups/visual-style-v3.html`):
 | blush minor | #F9DCE6 | pause/drop buttons |
 | cream track | #F9E4D4 | bar tracks |
 | cream chip | #FFF4E4, dashed #F4AFC8 | your-call chip |
+| mauve text | #A2547A | quip, your-call chip, drawer note text |
+| tabs track | #F9E9DC | tab bar background |
 
 Type: "Segoe UI", system-ui stack; heavy weights (800/900) for game chrome; big rounded radii (10 to 20 px); chunky soft shadows. Overtime state uses the deepest rose, not a new hue. No colors outside the pink spectrum + cream.
 

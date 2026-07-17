@@ -12,7 +12,7 @@
 
 - Repo root: `C:\Users\ntangs\Documents\Product-Madness\`. The game file is `Product Madness v1.html` at repo root (name has a space - always quote paths; in file URLs write it as `Product%20Madness%20v1.html`).
 - Single standalone file: no CDN, no external fonts/images/scripts. Icons = emoji/inline SVG. Only network call: `https://api.anthropic.com/v1/messages`, and only when the user enables it.
-- Colors: ONLY the Strawberries & Cream tokens from spec section 5.6 (plus `#fff` and transparent). No blue, no purple, no green, no red hues outside the pink spectrum.
+- Colors: every color literal must be (or equal in value) a `:root` Strawberries & Cream token, `#fff`, `transparent`, or an alpha (rgba) variant of a token color. No blue, no purple, no green, no red hues outside the pink spectrum. CSS uses `var()` for token colors; JS-drawn graphics (confetti) may use token hex values as literals.
 - UI copy uses plain hyphens. Never em-dashes or en-dashes anywhere, including code comments and commit messages.
 - Vanilla JS only. No dependencies, no TypeScript, no modules/imports - plain `<script>` with `const` namespace objects.
 - localStorage key: `product-madness.v1`. Schema per spec 5.3.
