@@ -247,6 +247,50 @@ const U = {
 };
 
 // ===== Rules =====
+const Rules = {
+  stars(actualSec, parSec) {
+    const t = actualSec / parSec;
+    if (t <= 0.75) return 3;
+    if (t <= 0.95) return 2;
+    if (t <= 1.0) return 1;
+    return 0;
+  },
+  comboMultiplier(count) { return count >= 5 ? 2 : ([1, 1, 1.1, 1.25, 1.5][count] || 1); },
+  taskXp(stars, showdownWin, comboCount) {
+    return Math.floor((10 + 5 * stars + (showdownWin ? 8 : 0)) * Rules.comboMultiplier(comboCount));
+  },
+  xpForLevel(n) { return n <= 1 ? 0 : Math.round(100 * Math.pow(n - 1, 1.5) / 10) * 10; },
+  levelForXp(xp) { let n = 1; while (Rules.xpForLevel(n + 1) <= xp) n++; return n; },
+  titleForLevel(n) {
+    const t = ['Dishwasher', 'Prep Cook', 'Line Cook', 'Station Chef', 'Sous Chef',
+               'Head Chef', 'Executive Chef', 'Michelin One-Star', 'Michelin Two-Star', 'Michelin Three-Star'];
+    if (n <= 10) return t[n - 1];
+    if (n === 11) return 'Legend of the Pass';
+    const R = [['X', 10], ['IX', 9], ['V', 5], ['IV', 4], ['I', 1]];
+    let k = n - 10, s = '';
+    for (const [sym, v] of R) while (k >= v) { s += sym; k -= v; }
+    return 'Legend of the Pass ' + s;
+  },
+  showdownWinner(myCallSec, parSec, actualSec) {
+    return Math.abs(myCallSec - actualSec) <= Math.abs(parSec - actualSec) ? 'you' : 'ai';
+  },
+  dayKey(d) { return `${d.getFullYear()}-${U.pad2(d.getMonth() + 1)}-${U.pad2(d.getDate())}`; },
+  weekOf(d) { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return Rules.dayKey(x); },
+  elapsedActiveMs(task, nowMs) {
+    const pausing = task.state === 'paused' && task.pausedAt ? (nowMs - task.pausedAt) : 0;
+    return nowMs - task.startedAt - (task.pausedMs || 0) - pausing;
+  },
+  currentComboBase(tasks, dayKey) {
+    const seq = tasks
+      .filter(t => (t.state === 'done' || t.state === 'dropped') && t.finishedAt && Rules.dayKey(new Date(t.finishedAt)) === dayKey)
+      .sort((a, b) => a.finishedAt - b.finishedAt);
+    let c = 0;
+    for (let i = seq.length - 1; i >= 0; i--) {
+      if (seq[i].state === 'done' && seq[i].stars > 0) c++; else break;
+    }
+    return c;
+  },
+};
 
 // ===== Estimator =====
 
@@ -285,6 +329,36 @@ SelfTest.suite(() => {
   SelfTest.eq('utils: median even count', U.median([10, 20, 30, 40]), 25);
   SelfTest.eq('utils: round5', U.round5(133), 135);
   SelfTest.eq('utils: clamp', U.clamp(9999, 30, 1200), 1200);
+});
+
+SelfTest.suite(() => {
+  SelfTest.eq('stars: 75% of par is 3', Rules.stars(75, 100), 3);
+  SelfTest.eq('stars: 76% is 2', Rules.stars(76, 100), 2);
+  SelfTest.eq('stars: 95% is 2', Rules.stars(95, 100), 2);
+  SelfTest.eq('stars: 96% is 1', Rules.stars(96, 100), 1);
+  SelfTest.eq('stars: exactly par is 1', Rules.stars(100, 100), 1);
+  SelfTest.eq('stars: overtime is 0', Rules.stars(101, 100), 0);
+  SelfTest.eq('combo: multipliers', [0,1,2,3,4,5,9].map(Rules.comboMultiplier), [1,1,1.1,1.25,1.5,2,2]);
+  SelfTest.eq('xp: 3 stars + win at combo 4', Rules.taskXp(3, true, 4), Math.floor(33 * 1.5));
+  SelfTest.eq('xp: 0 stars no win combo 0', Rules.taskXp(0, false, 0), 10);
+  SelfTest.eq('levels: thresholds', [2,3,4,5,6,7,8,9,10].map(Rules.xpForLevel), [100,280,520,800,1120,1470,1850,2260,2700]);
+  SelfTest.eq('levels: levelForXp boundaries', [0,99,100,279,280,2700].map(Rules.levelForXp), [1,1,2,2,3,10]);
+  SelfTest.eq('titles: 1 and 10', [Rules.titleForLevel(1), Rules.titleForLevel(10)], ['Dishwasher','Michelin Three-Star']);
+  SelfTest.eq('titles: 11 and 12', [Rules.titleForLevel(11), Rules.titleForLevel(12)], ['Legend of the Pass','Legend of the Pass II']);
+  SelfTest.eq('showdown: closer call wins', Rules.showdownWinner(150, 210, 160), 'you');
+  SelfTest.eq('showdown: tie goes to you', Rules.showdownWinner(150, 210, 180), 'you');
+  SelfTest.eq('showdown: ai closer', Rules.showdownWinner(60, 170, 180), 'ai');
+  SelfTest.eq('weekOf: Thu 2026-07-16 is week of Mon 13th', Rules.weekOf(new Date(2026, 6, 16)), '2026-07-13');
+  SelfTest.eq('weekOf: Sun maps back to Monday', Rules.weekOf(new Date(2026, 6, 19)), '2026-07-13');
+  SelfTest.eq('weekOf: Monday maps to itself', Rules.weekOf(new Date(2026, 6, 13)), '2026-07-13');
+  SelfTest.eq('elapsed: running excludes pausedMs', Rules.elapsedActiveMs({ startedAt: 1000, pausedMs: 500, pausedAt: null, state: 'running' }, 3000), 1500);
+  SelfTest.eq('elapsed: paused freezes clock', Rules.elapsedActiveMs({ startedAt: 1000, pausedMs: 0, pausedAt: 2000, state: 'paused' }, 5000), 1000);
+  const mk = (state, stars, finishedAt) => ({ state, stars, finishedAt });
+  const D = new Date(2026, 6, 16, 10).getTime();
+  SelfTest.eq('combo base: two starred', Rules.currentComboBase([mk('done',2,D), mk('done',1,D+1)], '2026-07-16'), 2);
+  SelfTest.eq('combo base: drop breaks', Rules.currentComboBase([mk('done',2,D), mk('dropped',0,D+1)], '2026-07-16'), 0);
+  SelfTest.eq('combo base: zero-star breaks then rebuilds', Rules.currentComboBase([mk('done',0,D), mk('done',2,D+1)], '2026-07-16'), 1);
+  SelfTest.eq('combo base: other days excluded', Rules.currentComboBase([mk('done',3,D - 86400000)], '2026-07-16'), 0);
 });
 
 // ===== Boot =====
