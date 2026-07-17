@@ -293,6 +293,42 @@ const Rules = {
 };
 
 // ===== Estimator =====
+const SEED_CATEGORIES = {
+  'email-reply': { label: 'Email reply', emoji: '✉️', keywords: ['email', 'reply', 'respond', 'inbox'], baselineSec: 180, samples: [], archived: false },
+  'chat-reply':  { label: 'Teams/chat reply', emoji: '💬', keywords: ['teams', 'chat', 'slack', 'message', 'ping'], baselineSec: 90, samples: [], archived: false },
+  'jira-comment':{ label: 'Jira comment', emoji: '🎫', keywords: ['jira comment', 'comment', 'acm-'], baselineSec: 150, samples: [], archived: false },
+  'jira-draft':  { label: 'Jira ticket draft', emoji: '📝', keywords: ['ticket', 'story', 'jira', 'draft'], baselineSec: 300, samples: [], archived: false },
+  'grooming':    { label: 'Backlog grooming', emoji: '🧹', keywords: ['groom', 'backlog', 'triage'], baselineSec: 300, samples: [], archived: false },
+  'wireframe':   { label: 'Wireframe edit', emoji: '🎨', keywords: ['wireframe', 'mockup', 'html'], baselineSec: 240, samples: [], archived: false },
+  'doc-review':  { label: 'Doc review skim', emoji: '📄', keywords: ['review', 'skim', 'read'], baselineSec: 240, samples: [], archived: false },
+  'notes':       { label: 'Meeting notes', emoji: '🗒️', keywords: ['notes', 'recap', 'minutes'], baselineSec: 240, samples: [], archived: false },
+  'agenda':      { label: 'Agenda prep', emoji: '📋', keywords: ['agenda', 'prep', '1:1'], baselineSec: 300, samples: [], archived: false },
+  'status':      { label: 'Status update', emoji: '📣', keywords: ['status', 'update', 'standup'], baselineSec: 180, samples: [], archived: false },
+  'calendar':    { label: 'Calendar wrangling', emoji: '📆', keywords: ['calendar', 'schedule', 'invite'], baselineSec: 120, samples: [], archived: false },
+  'files':       { label: 'File cleanup', emoji: '🗂️', keywords: ['file', 'rename', 'organize', 'folder'], baselineSec: 120, samples: [], archived: false },
+  'data-check':  { label: 'Quick data check', emoji: '🔎', keywords: ['check', 'verify', 'lookup'], baselineSec: 180, samples: [], archived: false },
+  'nudge':       { label: 'Follow-up nudge', emoji: '👋', keywords: ['follow up', 'nudge', 'remind'], baselineSec: 90, samples: [], archived: false },
+  'other':       { label: 'Other', emoji: '⭐', keywords: [], baselineSec: 180, samples: [], archived: false },
+};
+
+const Estimator = {
+  detectCategory(title, categories) {
+    const t = title.toLowerCase();
+    for (const [id, c] of Object.entries(categories)) {
+      if (c.archived || !c.keywords.length) continue;
+      if (c.keywords.some(k => t.includes(k))) return id;
+    }
+    return 'other';
+  },
+  localPar(cat) {
+    const s = cat.samples;
+    let sec;
+    if (s.length >= 3) sec = U.median(s.slice(-5));
+    else if (s.length > 0) sec = (s.reduce((a, b) => a + b, 0) + cat.baselineSec * (3 - s.length)) / 3;
+    else sec = cat.baselineSec;
+    return U.clamp(U.round5(sec), 30, 1200);
+  },
+};
 
 // ===== Quests =====
 
@@ -359,6 +395,24 @@ SelfTest.suite(() => {
   SelfTest.eq('combo base: drop breaks', Rules.currentComboBase([mk('done',2,D), mk('dropped',0,D+1)], '2026-07-16'), 0);
   SelfTest.eq('combo base: zero-star breaks then rebuilds', Rules.currentComboBase([mk('done',0,D), mk('done',2,D+1)], '2026-07-16'), 1);
   SelfTest.eq('combo base: other days excluded', Rules.currentComboBase([mk('done',3,D - 86400000)], '2026-07-16'), 0);
+});
+
+SelfTest.suite(() => {
+  SelfTest.eq('detect: email keyword', Estimator.detectCategory('Reply to Kaitlin email', SEED_CATEGORIES), 'email-reply');
+  SelfTest.eq('detect: multi-word phrase', Estimator.detectCategory('follow up with Gildas', SEED_CATEGORIES), 'nudge');
+  SelfTest.eq('detect: no match falls to other', Estimator.detectCategory('water the plants', SEED_CATEGORIES), 'other');
+  SelfTest.eq('detect: case-insensitive', Estimator.detectCategory('GROOM the backlog', SEED_CATEGORIES), 'grooming');
+  const cat = (baselineSec, samples) => ({ baselineSec, samples, archived: false });
+  SelfTest.eq('par: 0 samples uses baseline', Estimator.localPar(cat(180, [])), 180);
+  SelfTest.eq('par: 1 sample blends', Estimator.localPar(cat(180, [60])), 140);
+  SelfTest.eq('par: 2 samples blend', Estimator.localPar(cat(180, [60, 90])), 110);
+  SelfTest.eq('par: 3 samples use median', Estimator.localPar(cat(180, [100, 200, 300])), 200);
+  SelfTest.eq('par: 6+ samples use last five', Estimator.localPar(cat(180, [600, 100, 100, 100, 100, 100])), 100);
+  SelfTest.eq('par: rounds to 5s', Estimator.localPar(cat(133, [])), 135);
+  SelfTest.eq('par: clamps low', Estimator.localPar(cat(180, [5, 5, 5])), 30);
+  SelfTest.eq('par: clamps high', Estimator.localPar(cat(180, [4000, 4000, 4000])), 1200);
+  SelfTest.ok('seed: 15 categories', Object.keys(SEED_CATEGORIES).length === 15);
+  SelfTest.ok('seed: other has no keywords', SEED_CATEGORIES.other.keywords.length === 0);
 });
 
 // ===== Boot =====
