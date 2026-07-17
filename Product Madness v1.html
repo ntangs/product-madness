@@ -453,9 +453,58 @@ const Store = {
 // ===== ApiClient =====
 
 // ===== Sfx =====
-const Sfx = { tick() {}, ding() {}, star() {}, womp() {}, levelUp() {} };
+const Sfx = {
+  ctx: null,
+  on: () => Store.state && Store.state.settings.sound,
+  beep(freq, dur = 0.1, type = 'triangle', gain = 0.04, when = 0) {
+    if (!Sfx.on()) return;
+    try {
+      const c = Sfx.ctx || (Sfx.ctx = new (window.AudioContext || window.webkitAudioContext)());
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.value = freq;
+      o.connect(g); g.connect(c.destination);
+      const t = c.currentTime + when;
+      g.gain.setValueAtTime(gain, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); o.stop(t + dur + 0.02);
+    } catch (e) { /* audio unavailable - stay silent */ }
+  },
+  tick() { Sfx.beep(880, 0.05, 'square', 0.02); },
+  ding() { Sfx.beep(1046, 0.15); Sfx.beep(1318, 0.15, 'triangle', 0.04, 0.12); },
+  star(n) { for (let i = 0; i < Math.max(1, n); i++) Sfx.beep(1046 + i * 262, 0.12, 'triangle', 0.05, i * 0.12); },
+  womp() { Sfx.beep(196, 0.3, 'sawtooth', 0.03); Sfx.beep(147, 0.35, 'sawtooth', 0.03, 0.18); },
+  levelUp() { [523, 659, 784, 1046, 1318].forEach((f, i) => Sfx.beep(f, 0.15, 'triangle', 0.05, i * 0.09)); },
+};
 
 // ===== Fx =====
+const Fx = {
+  parts: [], running: false,
+  burst(n = 90) {
+    const cv = document.getElementById('fx');
+    cv.width = innerWidth; cv.height = innerHeight;
+    const colors = ['#F2708F', '#F49FBC', '#FFC9DB', '#FFF4E4', '#E9678C', '#FFDCE8'];
+    for (let i = 0; i < n; i++) {
+      Fx.parts.push({ x: cv.width / 2, y: cv.height / 2.4,
+        vx: (Math.random() - 0.5) * 14, vy: -Math.random() * 13 - 3,
+        s: 5 + Math.random() * 6, r: Math.random() * Math.PI,
+        c: colors[i % colors.length], life: 90 + Math.random() * 40 });
+    }
+    if (!Fx.running) { Fx.running = true; Fx.loop(); }
+  },
+  loop() {
+    const cv = document.getElementById('fx'), ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    Fx.parts = Fx.parts.filter(p => p.life > 0);
+    for (const p of Fx.parts) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.35; p.r += 0.1; p.life--;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+      ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6);
+      ctx.restore();
+    }
+    if (Fx.parts.length) requestAnimationFrame(Fx.loop);
+    else { Fx.running = false; ctx.clearRect(0, 0, cv.width, cv.height); }
+  },
+};
 
 // ===== UI =====
 const UI = {
@@ -505,6 +554,7 @@ const UI = {
     UI.el('btn-pause').addEventListener('click', () => { const t = UI.task(); if (t) UI.togglePause(t); });
     UI.el('btn-drop').addEventListener('click', () => { const t = UI.task(); if (t) UI.dropTask(t); });
     UI.el('call-slider').addEventListener('input', e => UI.setCall(Number(e.target.value)));
+    UI.el('levelup-ok').addEventListener('click', () => { UI.el('levelup').hidden = true; });
     UI.el('tab-kitchen').addEventListener('click', () => UI.switchTab('kitchen'));
     UI.el('tab-progress').addEventListener('click', () => UI.switchTab('progress'));
   },
@@ -621,6 +671,8 @@ const UI = {
     p.level = Rules.levelForXp(p.xp);
     Store.save();
     const starTxt = task.stars > 0 ? '★'.repeat(task.stars) : 'overtime';
+    if (task.stars > 0) Sfx.star(task.stars); else Sfx.womp();
+    if (task.stars === 3) Fx.burst(50);
     UI.toast(`${starTxt} +${task.xp} XP` + (combo >= 2 ? ` (x${Rules.comboMultiplier(combo)} combo)` : ''));
     UI.toast(win ? '🥊 you beat the AI!' : '🤖 the AI takes this one');
     const flavor = UI.finishFlavor(task);
@@ -771,8 +823,20 @@ const UI = {
       hist.appendChild(row);
     }
   },
-  finishFlavor(task) { return ''; },  // Task 8
-  onLevelUp(newLevel) { UI.toast('🎉 Level ' + newLevel + ' - ' + Rules.titleForLevel(newLevel)); }, // Task 8 upgrades
+  finishFlavor(task) {
+    if (task.quip && task.parSource === 'api') return '';
+    const win = ['Called it. The kitchen fears you.', 'Chef things. Keep moving.', 'That ticket never stood a chance.'];
+    const lose = ['The AI smirks quietly.', 'Par stands. Next order.', 'Recalibrating your legend...'];
+    const pool = task.showdownWin ? win : lose;
+    return pool[task.finishedAt % pool.length];
+  },
+  onLevelUp(newLevel) {
+    UI.el('levelup-title').textContent = 'Level ' + newLevel + '!';
+    UI.el('levelup-sub').textContent = 'You are now: ' + Rules.titleForLevel(newLevel);
+    UI.el('levelup').hidden = false;
+    Fx.burst();
+    Sfx.levelUp();
+  },
 
   // --- restore + banners + toasts ---
   maybeRestore() {
