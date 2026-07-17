@@ -87,6 +87,9 @@
   #quick-log:focus { border-color:var(--rose-1); }
   .chip { background:var(--blush-minor); color:var(--hud-text); border-radius:999px; padding:4px 10px;
           font-size:11px; font-weight:800; white-space:nowrap; cursor:pointer; }
+  #btn-mic { background:var(--blush-minor); border-radius:12px; padding:8px 12px; font-size:15px; flex:0 0 auto; }
+  #btn-mic.listening { background:linear-gradient(180deg,var(--tab-1),var(--tab-2)); animation:pulse 1s infinite; }
+  #btn-mic.unavailable { display:none; }
   #order-rail { display:flex; gap:8px; overflow-x:auto; padding:10px 2px 4px; min-height:64px; flex:0 0 auto; }
   .ticket { background:var(--cream-surface); border:2px solid var(--pink-border); border-radius:12px;
             padding:6px 10px; min-width:130px; max-width:170px; flex:0 0 auto; font-size:12px; }
@@ -196,6 +199,7 @@
         </div>
       </div>
       <div id="quicklog-wrap">
+        <button id="btn-mic" title="speak a task">🎤</button>
         <input id="quick-log" placeholder="+ log a task and press Enter" maxlength="80">
         <span id="quick-cat" class="chip" hidden title="tap to change category"></span>
       </div>
@@ -564,6 +568,31 @@ const Fx = {
 };
 
 // ===== UI =====
+const Voice = {
+  rec: null, listening: false,
+  supported: () => !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+  toggle() {
+    if (Voice.listening) { try { Voice.rec.stop(); } catch (e) {} return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const r = Voice.rec = new SR();
+    r.lang = 'en-US'; r.interimResults = false; r.maxAlternatives = 1;
+    const btn = UI.el('btn-mic');
+    const done = () => { Voice.listening = false; btn.classList.remove('listening'); };
+    r.onstart = () => { Voice.listening = true; btn.classList.add('listening'); };
+    r.onend = done;
+    r.onerror = e => { done(); UI.toast(e.error === 'not-allowed' ? 'mic blocked - allow it for this page (Win+H works too)' : 'voice hiccup - try again or Win+H'); };
+    r.onresult = ev => {
+      const text = ((ev.results[0] && ev.results[0][0] && ev.results[0][0].transcript) || '').trim();
+      if (!text) return;
+      const input = UI.el('quick-log');
+      input.value = text.slice(0, 80);
+      input.dispatchEvent(new Event('input'));
+      input.focus();
+    };
+    try { r.start(); } catch (e) { done(); }
+  },
+};
+
 const UI = {
   flow: { stage: 'idle', taskId: null },
   el: id => document.getElementById(id),
@@ -607,6 +636,8 @@ const UI = {
       Store.save();
       UI.syncCatChip(task);
     });
+    if (Voice.supported()) UI.el('btn-mic').addEventListener('click', Voice.toggle);
+    else UI.el('btn-mic').classList.add('unavailable');
     UI.el('btn-lock').addEventListener('click', UI.lockCall);
     UI.el('btn-cancel-call').addEventListener('click', () => {
       UI.flow = { stage: 'idle', taskId: null };
