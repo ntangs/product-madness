@@ -706,8 +706,71 @@ const UI = {
     if (name === 'progress') UI.renderProgress();
   },
   renderAll() { UI.renderStage(); UI.renderRail(); UI.renderHud(); UI.renderProgress(); },
-  renderHud() {},        // Task 7
-  renderProgress() {},   // Task 7
+  renderHud() {
+    const p = Store.state.player;
+    UI.el('hud-title').textContent = Rules.titleForLevel(p.level);
+    UI.el('hud-lv').textContent = 'Lv ' + p.level;
+    const lo = Rules.xpForLevel(p.level), hi = Rules.xpForLevel(p.level + 1);
+    UI.el('hud-xpfill').style.width = Math.min(100, ((p.xp - lo) / (hi - lo)) * 100) + '%';
+    UI.el('hud-stars').textContent = '★ ' + p.starsTotal;
+    const pips = document.querySelectorAll('#hud-quests .pip');
+    Store.state.quests.items.forEach((q, i) => { if (pips[i]) pips[i].classList.toggle('done', q.done); });
+  },
+
+  categoryRecords() {
+    return Object.entries(Store.state.categories)
+      .filter(([, c]) => c.samples.length > 0)
+      .map(([id, c]) => ({ id, label: c.label, emoji: c.emoji,
+        median: U.median(c.samples), best: Math.min(...c.samples), count: c.samples.length }))
+      .sort((a, b) => b.count - a.count);
+  },
+
+  renderProgress() {
+    const ql = UI.el('quest-list');
+    ql.innerHTML = '';
+    for (const q of Store.state.quests.items) {
+      const row = document.createElement('div');
+      row.className = 'prow';
+      row.innerHTML = `<span>${q.done ? '✅' : '▢'} ${U.esc(q.label)}</span><b>${Math.min(q.progress, q.target)}/${q.target} · +${q.rewardXp}</b>`;
+      ql.appendChild(row);
+      const bar = document.createElement('div');
+      bar.className = 'qbar';
+      bar.innerHTML = `<i style="width:${Math.min(100, (q.progress / q.target) * 100)}%"></i>`;
+      ql.appendChild(bar);
+    }
+    const sd = Store.state.player.showdown;
+    UI.el('scoreboard').textContent = `YOU ${sd.you} - ${sd.ai} AI 🥊`;
+    const rc = UI.el('records');
+    rc.innerHTML = '';
+    for (const r of UI.categoryRecords()) {
+      const row = document.createElement('div');
+      row.className = 'prow';
+      row.innerHTML = `<span>${r.emoji} ${U.esc(r.label)}</span><b>~${U.mmss(r.median)} · best ${U.mmss(r.best)} · x${r.count}</b>`;
+      rc.appendChild(row);
+    }
+    const hist = UI.el('history');
+    hist.innerHTML = '';
+    const finished = Store.state.tasks
+      .filter(t => (t.state === 'done' || t.state === 'dropped') && t.finishedAt)
+      .sort((a, b) => b.finishedAt - a.finishedAt)
+      .slice(0, 60);
+    let lastDay = '';
+    for (const t of finished) {
+      const day = Rules.dayKey(new Date(t.finishedAt));
+      if (day !== lastDay) {
+        lastDay = day;
+        const h = document.createElement('div');
+        h.className = 'hday'; h.textContent = day;
+        hist.appendChild(h);
+      }
+      const row = document.createElement('div');
+      row.className = 'prow';
+      row.innerHTML = t.state === 'dropped'
+        ? `<span>✕ ${U.esc(t.title)}</span><b>dropped</b>`
+        : `<span>${t.stars > 0 ? '★'.repeat(t.stars) : '⏱'} ${U.esc(t.title)}</span><b>${U.mmss(t.actualSec)} / par ${U.mmss(t.parSec)} ${t.showdownWin ? '🥊' : ''}</b>`;
+      hist.appendChild(row);
+    }
+  },
   finishFlavor(task) { return ''; },  // Task 8
   onLevelUp(newLevel) { UI.toast('🎉 Level ' + newLevel + ' - ' + Rules.titleForLevel(newLevel)); }, // Task 8 upgrades
 
@@ -881,6 +944,17 @@ SelfTest.suite(() => {
   SelfTest.eq('store: corrupt flagged', r2.corrupt, true);
   SelfTest.eq('store: corrupt raw preserved', r2.raw, '{broken json');
   SelfTest.ok('store: corrupt not auto-saved over', f2.data[Store.KEY] === '{broken json');
+});
+
+SelfTest.suite(() => {
+  const fake = { data: {}, getItem(k) { return k in this.data ? this.data[k] : null; }, setItem(k, v) { this.data[k] = v; }, removeItem(k) { delete this.data[k]; } };
+  Store.load(fake, new Date(2026, 6, 16, 9));
+  Store.state.categories['email-reply'].samples = [100, 200, 300];
+  Store.state.categories['notes'].samples = [240];
+  const rec = UI.categoryRecords();
+  SelfTest.eq('records: only sampled categories', rec.length, 2);
+  SelfTest.eq('records: sorted by count desc', rec[0].id, 'email-reply');
+  SelfTest.eq('records: median/best/count', [rec[0].median, rec[0].best, rec[0].count], [200, 100, 3]);
 });
 
 // ===== Boot =====
