@@ -1,0 +1,117 @@
+<h2>Rosewater &amp; Sky - your pink + blue palette</h2>
+<p class="subtitle">Pink is now the base, every lavender element is blue. Both scenes shown. One fork left: the DONE button. Click A or B.</p>
+
+<style>
+  .pk-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:18px; margin-top:14px; }
+  .pk-card { position:relative; border:2px solid #d8d8e0; border-radius:14px; padding:14px; cursor:pointer; background:rgba(255,255,255,.55); transition:border-color .15s, transform .15s; }
+  .pk-card:hover { transform:translateY(-2px); }
+  .pk-card.selected { border-color:#F27E9C; box-shadow:0 0 0 3px rgba(242,126,156,.28); }
+  .pk-card h3 { margin:0 0 2px; }
+  .pk-note { font-size:12px; opacity:.75; margin:0 0 10px; }
+  .pk-stage { background:#FBEDF2; border-radius:12px; padding:14px 8px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .pk-phone { background:#FFF5F8; border:3px solid #F2CBD9; border-radius:18px; padding:8px; font-size:8.5px; line-height:1.35; color:#7A5666; width:162px; flex:0 0 auto; font-family:"Segoe UI",system-ui,sans-serif; box-shadow:0 6px 14px rgba(180,120,150,.14); }
+  .pk-hud { display:flex; justify-content:space-between; align-items:center; gap:4px; background:linear-gradient(180deg,#FFDCE7,#FFCBDC); color:#8A4E68; border-radius:10px; padding:4px 6px; font-weight:800; margin-bottom:6px; }
+  .pk-lvl { background:rgba(255,255,255,.8); border-radius:999px; height:6px; width:34px; overflow:hidden; }
+  .pk-lvl i { display:block; height:100%; width:65%; background:linear-gradient(90deg,#FF9EBB,#7FBCEC); }
+  .pk-task { text-align:center; font-weight:800; font-size:11px; margin:4px 0 2px; }
+  .pk-timer { text-align:center; font-size:25px; font-weight:900; color:#E96F90; }
+  .pk-parbar { background:#F7DEE7; border-radius:999px; height:8px; margin:4px 7px; overflow:hidden; }
+  .pk-parbar i { display:block; height:100%; width:78%; background:linear-gradient(90deg,#8FC6F2,#B9DCF8); }
+  .pk-parline { text-align:center; font-size:8px; opacity:.85; }
+  .pk-bet { text-align:center; background:#E3F2FD; border:1.5px dashed #A9D4F5; border-radius:8px; padding:2px 4px; margin:4px 9px; font-weight:700; color:#3D6E99; }
+  .pk-done { border-radius:10px; text-align:center; font-weight:900; padding:5px; margin:5px 7px 3px; font-size:10px; }
+  .pk-done.mint { background:linear-gradient(180deg,#A8E3BD,#93D6AC); color:#356B4A; box-shadow:0 2.5px 0 #7FC497; }
+  .pk-done.blue { background:linear-gradient(180deg,#9CCBF4,#7FB6EC); color:#20507C; box-shadow:0 2.5px 0 #649BD6; }
+  .pk-row2 { display:flex; gap:4px; margin:0 7px; }
+  .pk-mini { flex:1; background:#F9DCE6; border-radius:7px; text-align:center; padding:2px; font-weight:700; }
+  .pk-ql { background:rgba(255,255,255,.9); border:1.5px solid #F2CBD9; border-radius:8px; padding:3px 5px; margin:6px 7px 4px; opacity:.85; }
+  .pk-tabs { display:flex; background:#F7E3EB; border-radius:9px; overflow:hidden; margin-top:6px; font-weight:800; text-align:center; }
+  .pk-tabs div { flex:1; padding:4px 0; }
+  .pk-tabs .on { background:linear-gradient(180deg,#8FC0F0,#74ADE6); color:#fff; }
+  .pk-sec { font-size:7.5px; font-weight:800; letter-spacing:.08em; opacity:.6; margin:5px 7px 2px; text-transform:uppercase; }
+  .pk-line { display:flex; justify-content:space-between; background:#fff; border-radius:7px; padding:3px 5px; margin:2px 7px; }
+  .pk-qbar { background:#F7DEE7; border-radius:999px; height:5px; margin:0 7px 2px; overflow:hidden; }
+  .pk-qbar i { display:block; height:100%; background:#7FBCEC; }
+  .pk-score { text-align:center; background:linear-gradient(180deg,#FFDCE7,#FFC9DB); border-radius:9px; margin:2px 7px 4px; padding:4px; font-weight:900; font-size:10.5px; color:#8A4E68; }
+  .pk-sw { display:flex; gap:7px; justify-content:center; margin-top:12px; }
+  .pk-sw i { width:22px; height:22px; border-radius:50%; border:2px solid rgba(255,255,255,.9); box-shadow:0 1px 3px rgba(0,0,0,.15); }
+  .pk-vibe { font-size:11.5px; margin-top:8px; text-align:center; opacity:.8; }
+</style>
+
+<div class="pk-grid">
+
+  <!-- A: mint DONE -->
+  <div class="pk-card option" data-choice="rosewater-mint-go" onclick="toggleSelect(this)">
+    <h3>A - Rosewater &amp; Sky, mint GO</h3>
+    <p class="pk-note">Pink base, blue accents, but the DONE button keeps a mint "go" green - success stays instantly readable, and stars/wins get to feel different from navigation.</p>
+    <div class="pk-stage">
+      <div class="pk-phone">
+        <div class="pk-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="pk-lvl"><i></i></span><span>★234</span></div>
+        <div class="pk-task">Reply to Kaitlin</div>
+        <div class="pk-timer">02:31</div>
+        <div class="pk-parbar"><i></i></div>
+        <div class="pk-parline">AI par 3:00 · beat it for ★★★</div>
+        <div class="pk-bet">🥊 my call: 2:30</div>
+        <div class="pk-done mint">✔ DONE</div>
+        <div class="pk-row2"><div class="pk-mini">⏸ pause</div><div class="pk-mini">✕ drop</div></div>
+        <div class="pk-ql">+ next task…</div>
+        <div class="pk-tabs"><div class="on">🍳 Kitchen</div><div>📈 Progress</div></div>
+      </div>
+      <div class="pk-phone">
+        <div class="pk-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="pk-lvl"><i></i></span><span>★234</span></div>
+        <div class="pk-sec">Daily quests</div>
+        <div class="pk-line"><span>Finish 5 tasks</span><span>3/5</span></div>
+        <div class="pk-qbar"><i style="width:60%"></i></div>
+        <div class="pk-line"><span>Beat the AI twice</span><span>1/2</span></div>
+        <div class="pk-qbar"><i style="width:50%"></i></div>
+        <div class="pk-sec">You vs AI - this week</div>
+        <div class="pk-score">YOU 12 – 8 AI 🥊</div>
+        <div class="pk-sec">Your records</div>
+        <div class="pk-line"><span>✉ Email reply</span><span>~2:10</span></div>
+        <div class="pk-line"><span>🎫 Jira comment</span><span>~3:40</span></div>
+        <div class="pk-tabs"><div>🍳 Kitchen</div><div class="on">📈 Progress</div></div>
+      </div>
+    </div>
+    <div class="pk-sw"><i style="background:#FFF5F8"></i><i style="background:#FFCBDC"></i><i style="background:#E96F90"></i><i style="background:#7FBCEC"></i><i style="background:#A8E3BD"></i></div>
+    <p class="pk-vibe">pink base · blue actions · mint reserved for "go &amp; win"</p>
+  </div>
+
+  <!-- B: strict two-tone -->
+  <div class="pk-card option" data-choice="rosewater-strict" onclick="toggleSelect(this)">
+    <h3>B - Strict pink &amp; blue</h3>
+    <p class="pk-note">Two flavors only - every element is pink or blue, DONE included. Cleanest, most "your palette", slightly less contrast between actions and wins.</p>
+    <div class="pk-stage">
+      <div class="pk-phone">
+        <div class="pk-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="pk-lvl"><i></i></span><span>★234</span></div>
+        <div class="pk-task">Reply to Kaitlin</div>
+        <div class="pk-timer">02:31</div>
+        <div class="pk-parbar"><i></i></div>
+        <div class="pk-parline">AI par 3:00 · beat it for ★★★</div>
+        <div class="pk-bet">🥊 my call: 2:30</div>
+        <div class="pk-done blue">✔ DONE</div>
+        <div class="pk-row2"><div class="pk-mini">⏸ pause</div><div class="pk-mini">✕ drop</div></div>
+        <div class="pk-ql">+ next task…</div>
+        <div class="pk-tabs"><div class="on">🍳 Kitchen</div><div>📈 Progress</div></div>
+      </div>
+      <div class="pk-phone">
+        <div class="pk-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="pk-lvl"><i></i></span><span>★234</span></div>
+        <div class="pk-sec">Daily quests</div>
+        <div class="pk-line"><span>Finish 5 tasks</span><span>3/5</span></div>
+        <div class="pk-qbar"><i style="width:60%"></i></div>
+        <div class="pk-line"><span>Beat the AI twice</span><span>1/2</span></div>
+        <div class="pk-qbar"><i style="width:50%"></i></div>
+        <div class="pk-sec">You vs AI - this week</div>
+        <div class="pk-score">YOU 12 – 8 AI 🥊</div>
+        <div class="pk-sec">Your records</div>
+        <div class="pk-line"><span>✉ Email reply</span><span>~2:10</span></div>
+        <div class="pk-line"><span>🎫 Jira comment</span><span>~3:40</span></div>
+        <div class="pk-tabs"><div>🍳 Kitchen</div><div class="on">📈 Progress</div></div>
+      </div>
+    </div>
+    <div class="pk-sw"><i style="background:#FFF5F8"></i><i style="background:#FFCBDC"></i><i style="background:#E96F90"></i><i style="background:#7FBCEC"></i><i style="background:#9CCBF4"></i></div>
+    <p class="pk-vibe">two flavors only · maximum palette purity</p>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:14px">Click A or B and tell me in the terminal. Any other tweaks (timer shade, background depth), just say the word.</p>

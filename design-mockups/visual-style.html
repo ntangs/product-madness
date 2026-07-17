@@ -1,0 +1,114 @@
+<h2>Pastel it is - which pastel?</h2>
+<p class="subtitle">Two-scene layout is locked. Same Kitchen screen, three pastel families. Click the one you want to live in all day.</p>
+
+<style>
+  .pp-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:18px; margin-top:14px; }
+  .pp-card { position:relative; border:2px solid #d8d8e0; border-radius:14px; padding:14px; cursor:pointer; background:rgba(255,255,255,.55); transition:border-color .15s, transform .15s; }
+  .pp-card:hover { transform:translateY(-2px); }
+  .pp-card.selected { border-color:#B9A3E8; box-shadow:0 0 0 3px rgba(185,163,232,.3); }
+  .pp-card h3 { margin:0 0 2px; }
+  .pp-note { font-size:12px; opacity:.75; margin:0 0 10px; }
+  .pp-stage { border-radius:12px; padding:14px 8px; display:flex; justify-content:center; }
+  .pp-phone { background:var(--pbg); border:3px solid var(--pbrd); border-radius:18px; padding:8px; font-size:9px; line-height:1.35; color:var(--txt); width:180px; font-family:"Segoe UI",system-ui,sans-serif; box-shadow:0 6px 14px rgba(120,100,140,.12); }
+  .pp-hud { display:flex; justify-content:space-between; align-items:center; gap:4px; background:linear-gradient(180deg,var(--hud1),var(--hud2)); color:var(--htx); border-radius:10px; padding:4px 7px; font-weight:800; margin-bottom:7px; }
+  .pp-lvl { background:rgba(255,255,255,.75); border-radius:999px; height:6px; width:36px; overflow:hidden; }
+  .pp-lvl i { display:block; height:100%; width:65%; background:linear-gradient(90deg,var(--lvl1),var(--lvl2)); }
+  .pp-task { text-align:center; font-weight:800; font-size:12px; margin:5px 0 2px; }
+  .pp-timer { text-align:center; font-size:27px; font-weight:900; color:var(--tmr); }
+  .pp-parbar { background:var(--trk); border-radius:999px; height:9px; margin:5px 8px; overflow:hidden; }
+  .pp-parbar i { display:block; height:100%; width:78%; background:var(--fill); }
+  .pp-parline { text-align:center; font-size:8px; opacity:.85; }
+  .pp-bet { text-align:center; background:var(--chipbg); border:1.5px dashed var(--chipbrd); border-radius:9px; padding:3px 4px; margin:5px 10px; font-weight:700; }
+  .pp-done { background:linear-gradient(180deg,var(--dn1),var(--dn2)); color:var(--dntx); border-radius:10px; text-align:center; font-weight:900; padding:6px; margin:6px 8px 4px; font-size:11px; box-shadow:0 2.5px 0 var(--dnsh); }
+  .pp-row2 { display:flex; gap:5px; margin:0 8px; }
+  .pp-mini { flex:1; background:var(--minibg); border-radius:8px; text-align:center; padding:3px; font-weight:700; }
+  .pp-ql { background:rgba(255,255,255,.85); border:1.5px solid var(--pbrd); border-radius:9px; padding:4px 6px; margin:7px 8px 5px; opacity:.8; }
+  .pp-tabs { display:flex; background:var(--tabbg); border-radius:10px; overflow:hidden; margin-top:7px; font-weight:800; text-align:center; }
+  .pp-tabs div { flex:1; padding:5px 0; }
+  .pp-tabs .on { background:linear-gradient(180deg,var(--tab1),var(--tab2)); color:var(--tabtx); }
+  .pp-sw { display:flex; gap:7px; justify-content:center; margin-top:12px; }
+  .pp-sw i { width:22px; height:22px; border-radius:50%; border:2px solid rgba(255,255,255,.9); box-shadow:0 1px 3px rgba(0,0,0,.15); }
+  .pp-vibe { font-size:11.5px; margin-top:10px; text-align:center; opacity:.8; }
+
+  .pal-peach { --pbg:#FFF6EC; --pbrd:#F3D9BE; --txt:#7D604B; --hud1:#FFE8CE; --hud2:#FFDDB8; --htx:#8A6248;
+    --lvl1:#FFB98F; --lvl2:#FFA0A0; --tmr:#F08A7A; --trk:#FBE8D2; --fill:linear-gradient(90deg,#B9E4BB,#FFD9A0);
+    --chipbg:#FFF3E2; --chipbrd:#F5C89A; --dn1:#BCE8C4; --dn2:#A5DBB0; --dntx:#3E7A4E; --dnsh:#8FC79C;
+    --minibg:#FBE3C9; --tabbg:#F9E7CF; --tab1:#FFC896; --tab2:#FFB37E; --tabtx:#7A4A28; }
+  .pal-mint { --pbg:#F4FBF8; --pbrd:#CDE9DC; --txt:#567065; --hud1:#D8F2E6; --hud2:#C5EADA; --htx:#4E7263;
+    --lvl1:#9FDCC0; --lvl2:#A5D3F0; --tmr:#6FAEDF; --trk:#E3F2EA; --fill:linear-gradient(90deg,#9FDCC0,#A5D3F0);
+    --chipbg:#EAF6F0; --chipbrd:#B7DECC; --dn1:#B3E4CB; --dn2:#9AD7BA; --dntx:#35694E; --dnsh:#84C4A3;
+    --minibg:#DFF0E7; --tabbg:#E0F1E9; --tab1:#A5D3F0; --tab2:#8CC4EA; --tabtx:#2F5E80; }
+  .pal-sorbet { --pbg:#FFFDF6; --pbrd:#E8D9EC; --txt:#6E6478; --hud1:#FFF3C4; --hud2:#FFEBA8; --htx:#86753B;
+    --lvl1:#FFC1D4; --lvl2:#CDBBF0; --tmr:#F5A0B0; --trk:#F4EDF7; --fill:linear-gradient(90deg,#ABE6C6,#A9D4F5);
+    --chipbg:#E3F2FD; --chipbrd:#A9D4F5; --dn1:#A8E3BD; --dn2:#93D6AC; --dntx:#356B4A; --dnsh:#7FC497;
+    --minibg:#F3E9F6; --tabbg:#F1E8F4; --tab1:#CBB8F0; --tab2:#B9A3E8; --tabtx:#4E3C77; }
+</style>
+
+<div class="pp-grid">
+
+  <div class="pp-card option" data-choice="peach-sorbet" onclick="toggleSelect(this)">
+    <h3>1 - Peach sorbet</h3>
+    <p class="pp-note">Warm pastel - the Cooking Madness spirit, softened. Cream, peach, soft coral timer, mint DONE.</p>
+    <div class="pp-stage" style="background:#FBEFE2">
+      <div class="pp-phone pal-peach">
+        <div class="pp-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="pp-lvl"><i></i></span><span>★234</span></div>
+        <div class="pp-task">Reply to Kaitlin</div>
+        <div class="pp-timer">02:31</div>
+        <div class="pp-parbar"><i></i></div>
+        <div class="pp-parline">AI par 3:00 · beat it for ★★★</div>
+        <div class="pp-bet">🥊 my call: 2:30</div>
+        <div class="pp-done">✔ DONE</div>
+        <div class="pp-row2"><div class="pp-mini">⏸ pause</div><div class="pp-mini">✕ drop</div></div>
+        <div class="pp-ql">+ next task…</div>
+        <div class="pp-tabs"><div class="on">🍳 Kitchen</div><div>📈 Progress</div></div>
+      </div>
+    </div>
+    <div class="pp-sw"><i style="background:#FFF6EC"></i><i style="background:#FFDDB8"></i><i style="background:#FFB37E"></i><i style="background:#F08A7A"></i><i style="background:#A5DBB0"></i></div>
+    <p class="pp-vibe">cozy bakery energy · warm all day</p>
+  </div>
+
+  <div class="pp-card option" data-choice="mint-sky" onclick="toggleSelect(this)">
+    <h3>2 - Mint &amp; sky</h3>
+    <p class="pp-note">Cool pastel - calm and airy. Mint, seafoam, sky blue timer. Least "candy", most serene.</p>
+    <div class="pp-stage" style="background:#E9F5EF">
+      <div class="pp-phone pal-mint">
+        <div class="pp-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="pp-lvl"><i></i></span><span>★234</span></div>
+        <div class="pp-task">Reply to Kaitlin</div>
+        <div class="pp-timer">02:31</div>
+        <div class="pp-parbar"><i></i></div>
+        <div class="pp-parline">AI par 3:00 · beat it for ★★★</div>
+        <div class="pp-bet">🥊 my call: 2:30</div>
+        <div class="pp-done">✔ DONE</div>
+        <div class="pp-row2"><div class="pp-mini">⏸ pause</div><div class="pp-mini">✕ drop</div></div>
+        <div class="pp-ql">+ next task…</div>
+        <div class="pp-tabs"><div class="on">🍳 Kitchen</div><div>📈 Progress</div></div>
+      </div>
+    </div>
+    <div class="pp-sw"><i style="background:#F4FBF8"></i><i style="background:#C5EADA"></i><i style="background:#9FDCC0"></i><i style="background:#6FAEDF"></i><i style="background:#A5D3F0"></i></div>
+    <p class="pp-vibe">spa-day focus · easiest on the eyes</p>
+  </div>
+
+  <div class="pp-card option" data-choice="sorbet-mix" onclick="toggleSelect(this)">
+    <h3>3 - Sorbet mix</h3>
+    <p class="pp-note">Pastel rainbow - butter HUD, strawberry timer, mint DONE, lavender tabs. Most playful, most "game".</p>
+    <div class="pp-stage" style="background:#F4EDF3">
+      <div class="pp-phone pal-sorbet">
+        <div class="pp-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="pp-lvl"><i></i></span><span>★234</span></div>
+        <div class="pp-task">Reply to Kaitlin</div>
+        <div class="pp-timer">02:31</div>
+        <div class="pp-parbar"><i></i></div>
+        <div class="pp-parline">AI par 3:00 · beat it for ★★★</div>
+        <div class="pp-bet">🥊 my call: 2:30</div>
+        <div class="pp-done">✔ DONE</div>
+        <div class="pp-row2"><div class="pp-mini">⏸ pause</div><div class="pp-mini">✕ drop</div></div>
+        <div class="pp-ql">+ next task…</div>
+        <div class="pp-tabs"><div class="on">🍳 Kitchen</div><div>📈 Progress</div></div>
+      </div>
+    </div>
+    <div class="pp-sw"><i style="background:#FFF3C4"></i><i style="background:#FFC1D4"></i><i style="background:#F5A0B0"></i><i style="background:#ABE6C6"></i><i style="background:#B9A3E8"></i></div>
+    <p class="pp-vibe">ice-cream shop arcade · every element a different flavor</p>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:14px">Click your pick, then tell me in the terminal - or name tweaks ("mint but with the strawberry timer").</p>

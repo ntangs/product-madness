@@ -1,0 +1,83 @@
+<h2>Strawberries &amp; Cream</h2>
+<p class="subtitle">Pink spectrum + cream only - no blue, no purple, no mint. Cream is the canvas; pink does all the talking, from blush chrome to a deep-rose DONE. Both scenes below.</p>
+
+<style>
+  .sc-wrap { display:flex; justify-content:center; margin-top:14px; }
+  .sc-hero { border:2px solid #d8d8e0; border-radius:16px; padding:18px; background:rgba(255,255,255,.55); max-width:560px; }
+  .sc-stage { background:#FBF3E7; border-radius:14px; padding:18px 12px; display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  .sc-phone { background:#FFFBF4; border:3px solid #F2C9D6; border-radius:20px; padding:9px; font-size:9px; line-height:1.4; color:#7E5865; width:180px; flex:0 0 auto; font-family:"Segoe UI",system-ui,sans-serif; box-shadow:0 8px 18px rgba(200,130,150,.16); }
+  .sc-hud { display:flex; justify-content:space-between; align-items:center; gap:4px; background:linear-gradient(180deg,#FFDCE8,#FFC9DB); color:#8A4E68; border-radius:11px; padding:4px 7px; font-weight:800; margin-bottom:7px; }
+  .sc-lvl { background:rgba(255,255,255,.85); border-radius:999px; height:6px; width:36px; overflow:hidden; }
+  .sc-lvl i { display:block; height:100%; width:65%; background:linear-gradient(90deg,#FF9EBB,#F2708F); }
+  .sc-task { text-align:center; font-weight:800; font-size:12px; margin:5px 0 2px; }
+  .sc-timer { text-align:center; font-size:27px; font-weight:900; color:#E9678C; }
+  .sc-parbar { background:#F9E4D4; border-radius:999px; height:9px; margin:5px 8px; overflow:hidden; }
+  .sc-parbar i { display:block; height:100%; width:78%; background:linear-gradient(90deg,#F49FBC,#F2708F); }
+  .sc-parline { text-align:center; font-size:8px; opacity:.85; }
+  .sc-bet { text-align:center; background:#FFF4E4; border:1.5px dashed #F4AFC8; border-radius:9px; padding:3px 4px; margin:5px 10px; font-weight:700; color:#A2547A; }
+  .sc-done { background:linear-gradient(180deg,#F2708F,#E85C82); color:#fff; border-radius:11px; text-align:center; font-weight:900; padding:6px; margin:6px 8px 4px; font-size:11px; box-shadow:0 3px 0 #C94E71; }
+  .sc-row2 { display:flex; gap:5px; margin:0 8px; }
+  .sc-mini { flex:1; background:#F9DCE6; border-radius:8px; text-align:center; padding:3px; font-weight:700; }
+  .sc-ql { background:#fff; border:1.5px solid #F2C9D6; border-radius:9px; padding:4px 6px; margin:7px 8px 5px; opacity:.85; }
+  .sc-tabs { display:flex; background:#F9E9DC; border-radius:10px; overflow:hidden; margin-top:7px; font-weight:800; text-align:center; }
+  .sc-tabs div { flex:1; padding:5px 0; }
+  .sc-tabs .on { background:linear-gradient(180deg,#F48FB1,#EC6F9C); color:#fff; }
+  .sc-sec { font-size:7.5px; font-weight:800; letter-spacing:.08em; opacity:.6; margin:6px 8px 2px; text-transform:uppercase; }
+  .sc-line { display:flex; justify-content:space-between; background:#fff; border-radius:8px; padding:3px 6px; margin:2px 8px; }
+  .sc-qbar { background:#F9E4D4; border-radius:999px; height:5px; margin:0 8px 3px; overflow:hidden; }
+  .sc-qbar i { display:block; height:100%; background:#F2708F; }
+  .sc-score { text-align:center; background:linear-gradient(180deg,#FFDCE8,#FFC9DB); border-radius:10px; margin:2px 8px 5px; padding:5px; font-weight:900; font-size:11px; color:#8A4E68; }
+  .sc-sw { display:flex; gap:8px; justify-content:center; margin-top:14px; }
+  .sc-sw i { width:24px; height:24px; border-radius:50%; border:2px solid rgba(255,255,255,.9); box-shadow:0 1px 3px rgba(0,0,0,.15); }
+  .sc-swlbl { text-align:center; font-size:10px; opacity:.6; margin-top:4px; }
+  .sc-ok { margin-top:16px; }
+</style>
+
+<div class="sc-wrap">
+  <div class="sc-hero">
+    <div class="sc-stage">
+      <div class="sc-phone">
+        <div class="sc-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="sc-lvl"><i></i></span><span>★234</span></div>
+        <div class="sc-task">Reply to Kaitlin</div>
+        <div class="sc-timer">02:31</div>
+        <div class="sc-parbar"><i></i></div>
+        <div class="sc-parline">AI par 3:00 · beat it for ★★★</div>
+        <div class="sc-bet">🥊 my call: 2:30</div>
+        <div class="sc-done">✔ DONE</div>
+        <div class="sc-row2"><div class="sc-mini">⏸ pause</div><div class="sc-mini">✕ drop</div></div>
+        <div class="sc-ql">+ next task…</div>
+        <div class="sc-tabs"><div class="on">🍳 Kitchen</div><div>📈 Progress</div></div>
+      </div>
+      <div class="sc-phone">
+        <div class="sc-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="sc-lvl"><i></i></span><span>★234</span></div>
+        <div class="sc-sec">Daily quests</div>
+        <div class="sc-line"><span>Finish 5 tasks</span><span>3/5</span></div>
+        <div class="sc-qbar"><i style="width:60%"></i></div>
+        <div class="sc-line"><span>Beat the AI twice</span><span>1/2</span></div>
+        <div class="sc-qbar"><i style="width:50%"></i></div>
+        <div class="sc-sec">You vs AI - this week</div>
+        <div class="sc-score">YOU 12 – 8 AI 🥊</div>
+        <div class="sc-sec">Your records</div>
+        <div class="sc-line"><span>✉ Email reply</span><span>~2:10</span></div>
+        <div class="sc-line"><span>🎫 Jira comment</span><span>~3:40</span></div>
+        <div class="sc-line"><span>📝 Meeting notes</span><span>~4:20</span></div>
+        <div class="sc-tabs"><div>🍳 Kitchen</div><div class="on">📈 Progress</div></div>
+      </div>
+    </div>
+    <div class="sc-sw">
+      <i style="background:#FBF3E7"></i><i style="background:#FFFBF4"></i><i style="background:#FFDCE8"></i><i style="background:#F49FBC"></i><i style="background:#F2708F"></i><i style="background:#E9678C"></i>
+    </div>
+    <div class="sc-swlbl">cream canvas → blush chrome → rose actions → strawberry timer</div>
+
+    <div class="options sc-ok">
+      <div class="option" data-choice="lock-strawberries-cream" onclick="toggleSelect(this)">
+        <div class="letter">✓</div>
+        <div class="content"><h3>Lock this palette</h3><p>Strawberries &amp; Cream becomes the game's look. DONE = deepest rose; if "go" ever feels unreadable in practice, we can revisit later.</p></div>
+      </div>
+      <div class="option" data-choice="needs-tweaks" onclick="toggleSelect(this)">
+        <div class="letter">✎</div>
+        <div class="content"><h3>Close, needs tweaks</h3><p>Click this and tell me in the terminal what to adjust - more/less pink, deeper timer, warmer cream, anything.</p></div>
+      </div>
+    </div>
+  </div>
+</div>

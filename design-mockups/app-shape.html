@@ -1,0 +1,166 @@
+<h2>How should the game window be structured?</h2>
+<p class="subtitle">Same game in all three - log a micro-task, race the AI's par time, earn stars, level up. They differ in how much lives on one screen. Click the one that feels right (you can click around before settling).</p>
+
+<style>
+  .tr-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; align-items:stretch; margin-top:14px; }
+  .tr-card { position:relative; border:2px solid #d8d8e0; border-radius:14px; padding:14px; cursor:pointer; background:rgba(255,255,255,.55); transition:border-color .15s, transform .15s; }
+  .tr-card:hover { transform:translateY(-2px); }
+  .tr-card.selected { border-color:#FF8A3D; box-shadow:0 0 0 3px rgba(255,138,61,.25); }
+  .tr-badge { position:absolute; top:-11px; right:12px; background:linear-gradient(180deg,#FFB93B,#FF8A3D); color:#fff; font-size:10px; font-weight:800; letter-spacing:.06em; padding:3px 10px; border-radius:999px; }
+  .tr-card h3 { margin:0 0 2px; }
+  .tr-note { font-size:12px; opacity:.75; margin:0 0 10px; }
+  .tr-stage { background:#2E2233; border-radius:12px; padding:12px 8px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .tr-phone { background:#FFF7EA; border:3px solid #E8B87E; border-radius:16px; padding:7px; font-size:8.5px; line-height:1.35; color:#6B3E1E; width:158px; flex:0 0 auto; font-family:"Segoe UI",system-ui,sans-serif; }
+  .tr-scene-label { text-align:center; color:#FFD98A; font-size:10px; font-weight:700; margin-top:6px; font-family:system-ui; }
+  .tr-hud { display:flex; justify-content:space-between; align-items:center; gap:4px; background:linear-gradient(180deg,#FFD98A,#FFC24E); border-radius:9px; padding:3px 6px; font-weight:800; margin-bottom:6px; }
+  .tr-lvl { background:#fff; border-radius:999px; height:6px; width:34px; overflow:hidden; }
+  .tr-lvl i { display:block; height:100%; width:65%; background:linear-gradient(90deg,#FF8A3D,#FF5A4E); }
+  .tr-task { text-align:center; font-weight:800; font-size:11px; margin:4px 0 2px; }
+  .tr-timer { text-align:center; font-size:24px; font-weight:900; color:#E5432F; letter-spacing:.02em; }
+  .tr-parbar { background:#FFE4BC; border-radius:999px; height:8px; margin:4px 6px; overflow:hidden; }
+  .tr-parbar i { display:block; height:100%; width:78%; background:linear-gradient(90deg,#6FD96F,#FFB93B); }
+  .tr-parline { text-align:center; font-size:8px; opacity:.85; }
+  .tr-bet { text-align:center; background:#FFEBD1; border:1.5px dashed #FFB93B; border-radius:8px; padding:2px 4px; margin:4px 8px; font-weight:700; }
+  .tr-done { background:linear-gradient(180deg,#6FD96F,#3FB53F); color:#fff; border-radius:9px; text-align:center; font-weight:900; padding:5px; margin:5px 6px 3px; font-size:10px; box-shadow:0 2px 0 #2E8F2E; }
+  .tr-row2 { display:flex; gap:4px; margin:0 6px; }
+  .tr-mini-btn { flex:1; background:#FFD9A8; border-radius:7px; text-align:center; padding:2px; font-weight:700; }
+  .tr-quicklog { background:#fff; border:1.5px solid #E8B87E; border-radius:8px; padding:3px 5px; margin:6px 6px 4px; color:#B98B5C; }
+  .tr-tabs { display:flex; background:#F6DCB2; border-radius:9px; overflow:hidden; margin-top:6px; font-weight:800; text-align:center; }
+  .tr-tabs div { flex:1; padding:4px 0; }
+  .tr-tabs .on { background:linear-gradient(180deg,#FF9A52,#FF7A2E); color:#fff; }
+  .tr-sec { font-size:7.5px; font-weight:800; letter-spacing:.08em; opacity:.6; margin:6px 6px 2px; text-transform:uppercase; }
+  .tr-line { display:flex; justify-content:space-between; background:#fff; border-radius:7px; padding:3px 5px; margin:2px 6px; }
+  .tr-qbar { background:#FFE4BC; border-radius:999px; height:5px; margin-top:2px; overflow:hidden; }
+  .tr-qbar i { display:block; height:100%; background:#FF8A3D; }
+  .tr-score { text-align:center; background:linear-gradient(180deg,#FFE9C4,#FFDCA0); border-radius:9px; margin:2px 6px 4px; padding:4px; font-weight:900; font-size:11px; }
+  .tr-flow { display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:center; }
+  .tr-frame { background:#FFF7EA; border:2px solid #E8B87E; border-radius:10px; width:104px; padding:5px; font-size:7px; color:#6B3E1E; }
+  .tr-frame .big { text-align:center; font-weight:900; font-size:9px; }
+  .tr-arrow { color:#FFD98A; font-size:14px; font-weight:900; }
+  .tr-pros { font-size:11.5px; margin-top:10px; }
+  .tr-pros span { display:block; margin:2px 0; }
+</style>
+
+<div class="tr-grid">
+
+  <!-- OPTION A: Two-scene -->
+  <div class="tr-card option" data-choice="two-scene" onclick="toggleSelect(this)">
+    <div class="tr-badge">RECOMMENDED</div>
+    <h3>A - Two-scene game</h3>
+    <p class="tr-note">A pure play screen ("Kitchen") + a stats screen ("Progress"). Flip with the tab bar. HUD with clock / level / stars always on top.</p>
+    <div class="tr-stage">
+      <div>
+        <div class="tr-phone">
+          <div class="tr-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="tr-lvl"><i></i></span><span>★234</span></div>
+          <div class="tr-task">Reply to Kaitlin</div>
+          <div class="tr-timer">02:31</div>
+          <div class="tr-parbar"><i></i></div>
+          <div class="tr-parline">AI par 3:00 · beat it for ★★★</div>
+          <div class="tr-bet">🥊 my call: 2:30</div>
+          <div class="tr-done">✔ DONE</div>
+          <div class="tr-row2"><div class="tr-mini-btn">⏸ pause</div><div class="tr-mini-btn">✕ drop</div></div>
+          <div class="tr-quicklog">+ next task…</div>
+          <div class="tr-tabs"><div class="on">🍳 Kitchen</div><div>📈 Progress</div></div>
+        </div>
+        <div class="tr-scene-label">Scene 1 - play</div>
+      </div>
+      <div>
+        <div class="tr-phone">
+          <div class="tr-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="tr-lvl"><i></i></span><span>★234</span></div>
+          <div class="tr-sec">Daily quests</div>
+          <div class="tr-line"><span>Finish 5 tasks</span><span>3/5</span></div>
+          <div class="tr-qbar" style="margin:0 6px 2px"><i style="width:60%"></i></div>
+          <div class="tr-line"><span>Beat the AI twice</span><span>1/2</span></div>
+          <div class="tr-qbar" style="margin:0 6px 2px"><i style="width:50%"></i></div>
+          <div class="tr-sec">You vs AI - this week</div>
+          <div class="tr-score">YOU 12 – 8 AI 🥊</div>
+          <div class="tr-sec">Your records</div>
+          <div class="tr-line"><span>✉ Email reply</span><span>~2:10</span></div>
+          <div class="tr-line"><span>🎫 Jira comment</span><span>~3:40</span></div>
+          <div class="tr-line"><span>📝 Meeting notes</span><span>~4:20</span></div>
+          <div class="tr-tabs"><div>🍳 Kitchen</div><div class="on">📈 Progress</div></div>
+        </div>
+        <div class="tr-scene-label">Scene 2 - stats</div>
+      </div>
+    </div>
+    <div class="tr-pros">
+      <span>✓ Play screen stays big and uncluttered - timer is the star</span>
+      <span>✓ Quests, records, and history get room to grow</span>
+      <span>✗ One tap to see quest progress mid-task</span>
+    </div>
+  </div>
+
+  <!-- OPTION B: One-screen -->
+  <div class="tr-card option" data-choice="one-screen" onclick="toggleSelect(this)">
+    <h3>B - One-screen HUD</h3>
+    <p class="tr-note">Everything on a single scrolling screen - no navigation at all. Fastest loop, most crowded.</p>
+    <div class="tr-stage">
+      <div>
+        <div class="tr-phone">
+          <div class="tr-hud"><span>🕐 2:47</span><span>Lv 7</span><span class="tr-lvl"><i></i></span><span>★234</span></div>
+          <div class="tr-quicklog" style="margin-top:2px">+ log a task…</div>
+          <div style="background:#FFEBD1;border-radius:9px;padding:3px 0 4px;margin:2px 4px;">
+            <div class="tr-task" style="font-size:9.5px">Reply to Kaitlin</div>
+            <div class="tr-timer" style="font-size:16px">02:31</div>
+            <div class="tr-parline">par 3:00 · my call 2:30</div>
+            <div class="tr-done" style="padding:3px;margin:3px 14px 0;font-size:8.5px">✔ DONE</div>
+          </div>
+          <div class="tr-sec">Today</div>
+          <div class="tr-line"><span>✔ Jira comment</span><span>★★ 1:40</span></div>
+          <div class="tr-line"><span>✔ Email reply</span><span>★★★ 2:10</span></div>
+          <div class="tr-sec">Quests</div>
+          <div class="tr-line"><span>Finish 5 tasks</span><span>3/5</span></div>
+          <div class="tr-sec">Records</div>
+          <div class="tr-line"><span>✉ Email</span><span>~2:10</span></div>
+          <div style="text-align:center;opacity:.5;margin-top:3px">⌄ scrolls ⌄</div>
+        </div>
+        <div class="tr-scene-label">Everything, one scroll</div>
+      </div>
+    </div>
+    <div class="tr-pros">
+      <span>✓ Zero navigation - log, play, and glance in one place</span>
+      <span>✓ Simplest to build and to live in</span>
+      <span>✗ Timer competes with lists; gets crowded as history grows</span>
+    </div>
+  </div>
+
+  <!-- OPTION C: Full shell -->
+  <div class="tr-card option" data-choice="full-shell" onclick="toggleSelect(this)">
+    <h3>C - Full game shell</h3>
+    <p class="tr-note">Splash screen, each workday is a "level" on a map, end-of-day results ceremony - plus everything in A. Most game, roughly double the build.</p>
+    <div class="tr-stage">
+      <div class="tr-flow">
+        <div class="tr-frame">
+          <div class="big" style="font-size:11px">TASK RUSH 🍳</div>
+          <div style="text-align:center;margin-top:6px"><span style="background:linear-gradient(180deg,#6FD96F,#3FB53F);color:#fff;border-radius:7px;padding:2px 8px;font-weight:900">▶ START SHIFT</span></div>
+        </div>
+        <div class="tr-arrow">→</div>
+        <div class="tr-frame">
+          <div class="big">Week map</div>
+          <div style="text-align:center;margin-top:4px">Mon──Tue──Wed──●Thu</div>
+          <div style="text-align:center">★★★ · ★★☆ · ★★★ · today</div>
+        </div>
+        <div class="tr-arrow">→</div>
+        <div class="tr-frame">
+          <div class="big">Kitchen</div>
+          <div style="text-align:center;color:#E5432F;font-weight:900;font-size:12px">02:31</div>
+          <div style="text-align:center">…same as option A…</div>
+        </div>
+        <div class="tr-arrow">→</div>
+        <div class="tr-frame">
+          <div class="big">SHIFT COMPLETE! ★★☆</div>
+          <div style="text-align:center;margin-top:3px">12 tasks · You 7–5 AI</div>
+          <div style="text-align:center;font-weight:900">+340 XP</div>
+        </div>
+      </div>
+    </div>
+    <div class="tr-pros">
+      <span>✓ Most game-like: ceremony, week map, daily stars</span>
+      <span>✓ End-of-day results screen is a great ritual</span>
+      <span>✗ ~2x the build of A; better as v2 once the loop proves fun</span>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:14px">Click a card to select it, then tell me in the terminal - or just tell me what you'd change (e.g. "A but with the results ceremony from C").</p>
