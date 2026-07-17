@@ -385,6 +385,70 @@ const Quests = {
 };
 
 // ===== Store =====
+const Store = {
+  KEY: 'product-madness.v1',
+  state: null,
+  storage: null,
+  defaults(nowDate) {
+    return {
+      version: 1,
+      player: { xp: 0, level: 1, starsTotal: 0, bestCombo: 0,
+                showdown: { weekOf: Rules.weekOf(nowDate), you: 0, ai: 0 } },
+      tasks: [],
+      categories: JSON.parse(JSON.stringify(SEED_CATEGORIES)),
+      quests: { date: Rules.dayKey(nowDate), items: Quests.forDate(Rules.dayKey(nowDate)) },
+      settings: { apiKey: '', apiEnabled: false, model: 'claude-haiku-4-5', sound: true, lastExportAt: null },
+    };
+  },
+  load(storage, nowDate) {
+    Store.storage = storage;
+    let raw = null, s = null, corrupt = false;
+    try { raw = storage.getItem(Store.KEY); if (raw) s = JSON.parse(raw); }
+    catch (e) { corrupt = true; }
+    if (s && s.version !== 1) { corrupt = true; s = null; }
+    if (!s) {
+      Store.state = Store.defaults(nowDate);
+      if (!corrupt && raw === null) Store.save();
+      return { corrupt, raw };
+    }
+    Store.state = s;
+    if (Store.ensureDay(nowDate) | Store.ensureWeek(nowDate)) Store.save();
+    return { corrupt: false, raw };
+  },
+  save() { try { Store.storage.setItem(Store.KEY, JSON.stringify(Store.state)); return true; } catch (e) { return false; } },
+  ensureDay(nowDate) {
+    const dk = Rules.dayKey(nowDate);
+    if (Store.state.quests.date === dk) return false;
+    Store.state.quests = { date: dk, items: Quests.forDate(dk) };
+    return true;
+  },
+  ensureWeek(nowDate) {
+    const wk = Rules.weekOf(nowDate), sd = Store.state.player.showdown;
+    if (sd.weekOf === wk) return false;
+    sd.weekOf = wk; sd.you = 0; sd.ai = 0;
+    return true;
+  },
+  recordSample(catId, sec) {
+    const c = Store.state.categories[catId];
+    if (!c) return;
+    c.samples.push(sec);
+    if (c.samples.length > 20) c.samples = c.samples.slice(-20);
+  },
+  exportJson() {
+    const copy = JSON.parse(JSON.stringify(Store.state));
+    copy.settings.apiKey = '';
+    return JSON.stringify(copy, null, 2);
+  },
+  importJson(text) {
+    let s;
+    try { s = JSON.parse(text); } catch (e) { return false; }
+    if (!s || s.version !== 1 || !s.player || !Array.isArray(s.tasks) || !s.categories || !s.quests || !s.settings) return false;
+    s.settings.apiKey = (Store.state && Store.state.settings.apiKey) || '';
+    Store.state = s;
+    Store.save();
+    return true;
+  },
+};
 
 // ===== ApiClient =====
 
@@ -489,6 +553,39 @@ SelfTest.suite(() => {
   const railItems = [{ templateId: 7, label: 'Clear 3 rail tickets, no drops', target: 3, rewardXp: 45, progress: 2, done: false }];
   Quests.applyDrop(railItems);
   SelfTest.eq('quests: drop resets rail quest', railItems[0].progress, 0);
+});
+
+SelfTest.suite(() => {
+  const fake = () => ({ data: {}, getItem(k) { return k in this.data ? this.data[k] : null; }, setItem(k, v) { this.data[k] = v; }, removeItem(k) { delete this.data[k]; } });
+  const D = new Date(2026, 6, 16, 9);
+  let f = fake();
+  let r = Store.load(f, D);
+  SelfTest.eq('store: fresh load not corrupt', r.corrupt, false);
+  SelfTest.eq('store: defaults level 1', Store.state.player.level, 1);
+  SelfTest.eq('store: quests dated today', Store.state.quests.date, '2026-07-16');
+  SelfTest.eq('store: showdown week Monday', Store.state.player.showdown.weekOf, '2026-07-13');
+  Store.state.player.xp = 123; Store.save();
+  Store.load(f, D);
+  SelfTest.eq('store: save/load roundtrip', Store.state.player.xp, 123);
+  SelfTest.eq('store: day rollover regenerates quests', Store.ensureDay(new Date(2026, 6, 17, 9)), true);
+  SelfTest.eq('store: quests now dated 17th', Store.state.quests.date, '2026-07-17');
+  SelfTest.eq('store: week rollover resets tally', (Store.state.player.showdown.you = 5, Store.ensureWeek(new Date(2026, 6, 20, 9)), Store.state.player.showdown.you), 0);
+  for (let i = 0; i < 25; i++) Store.recordSample('email-reply', 100 + i);
+  SelfTest.eq('store: samples capped at 20', Store.state.categories['email-reply'].samples.length, 20);
+  SelfTest.eq('store: samples keep newest', Store.state.categories['email-reply'].samples[19], 124);
+  Store.state.settings.apiKey = 'sk-ant-secret';
+  SelfTest.ok('store: export strips key', !Store.exportJson().includes('sk-ant-secret'));
+  SelfTest.eq('store: import garbage rejected', Store.importJson('{nope'), false);
+  SelfTest.eq('store: import wrong version rejected', Store.importJson('{"version":2}'), false);
+  const exported = Store.exportJson();
+  Store.state.player.xp = 999;
+  SelfTest.eq('store: import restores', (Store.importJson(exported), Store.state.player.xp), 123);
+  SelfTest.eq('store: import preserves local key', Store.state.settings.apiKey, 'sk-ant-secret');
+  const f2 = fake(); f2.data[Store.KEY] = '{broken json';
+  const r2 = Store.load(f2, D);
+  SelfTest.eq('store: corrupt flagged', r2.corrupt, true);
+  SelfTest.eq('store: corrupt raw preserved', r2.raw, '{broken json');
+  SelfTest.ok('store: corrupt not auto-saved over', f2.data[Store.KEY] === '{broken json');
 });
 
 // ===== Boot =====
