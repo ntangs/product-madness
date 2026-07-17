@@ -453,10 +453,305 @@ const Store = {
 // ===== ApiClient =====
 
 // ===== Sfx =====
+const Sfx = { tick() {}, ding() {}, star() {}, womp() {}, levelUp() {} };
 
 // ===== Fx =====
 
 // ===== UI =====
+const UI = {
+  flow: { stage: 'idle', taskId: null },
+  el: id => document.getElementById(id),
+  now: () => Date.now(),
+  _raf: null,
+
+  boot() {
+    const res = Store.load(window.localStorage, new Date());
+    UI.bind();
+    UI.renderAll();
+    UI.tickLoop();
+    if (res.corrupt) UI.showCorrupt(res.raw);
+    UI.maybeRestore();
+    setInterval(UI.rollover, 30000);
+  },
+
+  bind() {
+    UI.el('quick-log').addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const title = e.target.value.trim();
+      if (!title) return;
+      e.target.value = '';
+      const task = UI.addTask(title);
+      const busy = UI.flow.stage !== 'idle';
+      if (busy) { UI.toast('🎟 ticket on the rail'); UI.renderRail(); }
+      else UI.enterCall(task);
+    });
+    UI.el('quick-log').addEventListener('input', e => {
+      const t = e.target.value.trim();
+      const chip = UI.el('quick-cat');
+      if (!t) { chip.hidden = true; return; }
+      const cat = Store.state.categories[Estimator.detectCategory(t, Store.state.categories)];
+      chip.textContent = cat.emoji + ' ' + cat.label;
+      chip.hidden = false;
+    });
+    UI.el('btn-lock').addEventListener('click', UI.lockCall);
+    UI.el('btn-cancel-call').addEventListener('click', () => {
+      UI.flow = { stage: 'idle', taskId: null };
+      UI.renderStage(); UI.renderRail();
+    });
+    UI.el('btn-start').addEventListener('click', () => {
+      const t = UI.task(); if (t) UI.beginRun(t);
+    });
+    UI.el('btn-done').addEventListener('click', () => { const t = UI.task(); if (t) UI.finishTask(t); });
+    UI.el('btn-pause').addEventListener('click', () => { const t = UI.task(); if (t) UI.togglePause(t); });
+    UI.el('btn-drop').addEventListener('click', () => { const t = UI.task(); if (t) UI.dropTask(t); });
+    UI.el('call-slider').addEventListener('input', e => UI.setCall(Number(e.target.value)));
+    UI.el('tab-kitchen').addEventListener('click', () => UI.switchTab('kitchen'));
+    UI.el('tab-progress').addEventListener('click', () => UI.switchTab('progress'));
+  },
+
+  task() { return Store.state.tasks.find(t => t.id === UI.flow.taskId) || null; },
+
+  addTask(title) {
+    const category = Estimator.detectCategory(title, Store.state.categories);
+    const task = { id: U.uid(), title, category, state: 'queued',
+      createdAt: UI.now(), startedAt: 0, pausedMs: 0, pausedAt: null, finishedAt: 0,
+      parSec: 0, parSource: 'local', myCallSec: 0, actualSec: 0,
+      stars: 0, showdownWin: false, xp: 0, comboAt: 1, quip: '', fromRail: false };
+    Store.state.tasks.push(task);
+    Store.save();
+    return task;
+  },
+
+  // --- call picker ---
+  _callSec: 180,
+  enterCall(task) {
+    UI.flow = { stage: 'call', taskId: task.id };
+    UI.el('call-title').textContent = task.title;
+    const chips = UI.el('call-chips');
+    chips.innerHTML = '';
+    [60, 120, 180, 240, 300].forEach(sec => {
+      const b = document.createElement('button');
+      b.textContent = (sec / 60) + ' min';
+      b.dataset.sec = sec;
+      b.addEventListener('click', () => UI.setCall(sec));
+      chips.appendChild(b);
+    });
+    UI.setCall(180);
+    UI.renderStage(); UI.renderRail();
+  },
+  setCall(sec) {
+    UI._callSec = sec;
+    UI.el('call-slider').value = sec;
+    UI.el('call-value').textContent = U.mmss(sec);
+    document.querySelectorAll('#call-chips button').forEach(b =>
+      b.classList.toggle('on', Number(b.dataset.sec) === sec));
+  },
+  async lockCall() {
+    const task = UI.task(); if (!task) return;
+    task.myCallSec = UI._callSec;
+    UI.flow.stage = 'ready';
+    UI.renderStage();
+    await UI.revealPar(task);
+    Store.save();
+  },
+  async revealPar(task) {
+    const cat = Store.state.categories[task.category];
+    task.parSec = Estimator.localPar(cat);
+    task.parSource = 'local';
+    task.quip = '';
+    UI.el('ready-title').textContent = task.title;
+    UI.el('ready-par').textContent = U.mmss(task.parSec);
+    UI.el('ready-par-src').textContent = task.parSource;
+    UI.el('ready-call').textContent = U.mmss(task.myCallSec);
+    UI.el('ready-quip').textContent = task.quip;
+  },
+
+  // --- running ---
+  beginRun(task, fromRail = false) {
+    task.state = 'running';
+    task.startedAt = UI.now();
+    task.fromRail = task.fromRail || fromRail;
+    UI.flow = { stage: 'run', taskId: task.id };
+    UI.el('run-title').textContent = task.title;
+    UI.el('run-par').textContent = 'par ' + U.mmss(task.parSec);
+    UI.el('run-call').textContent = '🥊 ' + U.mmss(task.myCallSec);
+    Store.save();
+    UI.renderStage(); UI.renderRail();
+  },
+  async startTask(task, fromRail) {
+    UI.flow = { stage: 'call', taskId: task.id };
+    UI.enterCall(task);
+    task.fromRail = fromRail;
+  },
+  togglePause(task) {
+    if (task.state === 'running') { task.state = 'paused'; task.pausedAt = UI.now(); }
+    else if (task.state === 'paused') { task.pausedMs += UI.now() - task.pausedAt; task.pausedAt = null; task.state = 'running'; }
+    UI.el('btn-pause').textContent = task.state === 'paused' ? '▶ resume' : '⏸ pause';
+    UI.el('timer-display').classList.toggle('paused', task.state === 'paused');
+    Store.save();
+  },
+
+  finishTask(task) {
+    const nowD = new Date();
+    Store.ensureDay(nowD); Store.ensureWeek(nowD);
+    const dk = Rules.dayKey(nowD);
+    const base = Rules.currentComboBase(Store.state.tasks, dk);
+    const actualSec = Math.max(1, Math.round(Rules.elapsedActiveMs(task, UI.now()) / 1000));
+    if (task.state === 'paused') { task.pausedMs += UI.now() - task.pausedAt; task.pausedAt = null; }
+    task.state = 'done'; task.finishedAt = UI.now(); task.actualSec = actualSec;
+    task.stars = Rules.stars(actualSec, task.parSec);
+    const win = Rules.showdownWinner(task.myCallSec, task.parSec, actualSec) === 'you';
+    task.showdownWin = win;
+    const combo = task.stars > 0 ? base + 1 : 0;
+    task.comboAt = Math.max(1, combo);
+    task.xp = Rules.taskXp(task.stars, win, combo);
+    const p = Store.state.player;
+    const beforeLevel = Rules.levelForXp(p.xp);
+    p.xp += task.xp;
+    p.starsTotal += task.stars;
+    p.bestCombo = Math.max(p.bestCombo, combo);
+    p.showdown[win ? 'you' : 'ai']++;
+    Store.recordSample(task.category, actualSec);
+    const todayCats = new Set(Store.state.tasks
+      .filter(t => t.state === 'done' && t.finishedAt && Rules.dayKey(new Date(t.finishedAt)) === dk)
+      .map(t => t.category));
+    const newlyDone = Quests.applyFinish(Store.state.quests.items,
+      { stars: task.stars, showdownWin: win, combo, hour: nowD.getHours(), categoriesToday: todayCats.size, fromRail: task.fromRail });
+    for (const q of newlyDone) { p.xp += q.rewardXp; UI.toast('🏆 quest: ' + q.label + ' +' + q.rewardXp + ' XP'); }
+    p.level = Rules.levelForXp(p.xp);
+    Store.save();
+    const starTxt = task.stars > 0 ? '★'.repeat(task.stars) : 'overtime';
+    UI.toast(`${starTxt} +${task.xp} XP` + (combo >= 2 ? ` (x${Rules.comboMultiplier(combo)} combo)` : ''));
+    UI.toast(win ? '🥊 you beat the AI!' : '🤖 the AI takes this one');
+    const flavor = UI.finishFlavor(task);
+    if (flavor) UI.toast(flavor);
+    if (p.level > beforeLevel) UI.onLevelUp(p.level);
+    UI.flow = { stage: 'idle', taskId: null };
+    UI.renderAll();
+  },
+
+  dropTask(task) {
+    if (task.state === 'paused' && task.pausedAt) { task.pausedMs += UI.now() - task.pausedAt; task.pausedAt = null; }
+    task.state = 'dropped'; task.finishedAt = UI.now();
+    Quests.applyDrop(Store.state.quests.items);
+    Store.save();
+    UI.toast('✕ dropped - no harm done');
+    UI.flow = { stage: 'idle', taskId: null };
+    UI.renderAll();
+  },
+
+  // --- timer loop ---
+  tickLoop() {
+    const step = () => {
+      const t = UI.task();
+      if (UI.flow.stage === 'run' && t && (t.state === 'running' || t.state === 'paused')) {
+        const el = Math.round(Rules.elapsedActiveMs(t, UI.now()) / 1000);
+        const remain = t.parSec - el;
+        const disp = UI.el('timer-display');
+        if (remain >= 0) {
+          disp.textContent = U.mmss(remain);
+          disp.classList.remove('overtime');
+          if (remain <= 5 && remain > 0 && t.state === 'running' && UI._lastTick !== remain) { UI._lastTick = remain; Sfx.tick(); }
+        } else {
+          disp.textContent = '+' + U.mmss(-remain);
+          disp.classList.add('overtime');
+        }
+        UI.el('par-fill').style.width = Math.min(100, (el / t.parSec) * 100) + '%';
+      }
+      const d = new Date();
+      UI.el('hud-clock').textContent = `${d.getHours() % 12 || 12}:${U.pad2(d.getMinutes())}${d.getHours() < 12 ? 'a' : 'p'}`;
+      UI._raf = requestAnimationFrame(step);
+    };
+    UI._raf = requestAnimationFrame(step);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) UI.renderAll(); });
+  },
+  _lastTick: null,
+
+  // --- rail + stage + scenes ---
+  renderRail() {
+    const rail = UI.el('order-rail');
+    const queued = Store.state.tasks.filter(t => t.state === 'queued' && t.id !== UI.flow.taskId);
+    rail.innerHTML = '';
+    for (const t of queued) {
+      const cat = Store.state.categories[t.category];
+      const tk = document.createElement('div');
+      tk.className = 'ticket';
+      tk.innerHTML = `<div class="t-title">${U.esc(t.title)}</div>
+        <div class="t-row"><span class="chip">${cat.emoji} ${U.esc(cat.label)}</span>
+        <button class="t-start">▶</button><button class="t-del">✕</button></div>`;
+      tk.querySelector('.t-start').addEventListener('click', () => {
+        if (UI.flow.stage !== 'idle') { UI.toast('finish the current task first'); return; }
+        UI.startTask(t, true);
+      });
+      tk.querySelector('.t-del').addEventListener('click', () => {
+        t.state = 'dropped'; t.finishedAt = UI.now(); Store.save(); UI.renderRail();
+      });
+      rail.appendChild(tk);
+    }
+  },
+  renderStage() {
+    const map = { idle: 'stage-idle', call: 'stage-call', ready: 'stage-ready', run: 'stage-run' };
+    for (const [stage, id] of Object.entries(map)) UI.el(id).classList.toggle('on', UI.flow.stage === stage);
+    const t = UI.task();
+    if (UI.flow.stage === 'run' && t) {
+      UI.el('btn-pause').textContent = t.state === 'paused' ? '▶ resume' : '⏸ pause';
+      UI.el('timer-display').classList.toggle('paused', t.state === 'paused');
+    }
+  },
+  switchTab(name) {
+    UI.el('scene-kitchen').classList.toggle('on', name === 'kitchen');
+    UI.el('scene-progress').classList.toggle('on', name === 'progress');
+    UI.el('tab-kitchen').classList.toggle('on', name === 'kitchen');
+    UI.el('tab-progress').classList.toggle('on', name === 'progress');
+    if (name === 'progress') UI.renderProgress();
+  },
+  renderAll() { UI.renderStage(); UI.renderRail(); UI.renderHud(); UI.renderProgress(); },
+  renderHud() {},        // Task 7
+  renderProgress() {},   // Task 7
+  finishFlavor(task) { return ''; },  // Task 8
+  onLevelUp(newLevel) { UI.toast('🎉 Level ' + newLevel + ' - ' + Rules.titleForLevel(newLevel)); }, // Task 8 upgrades
+
+  // --- restore + banners + toasts ---
+  maybeRestore() {
+    const t = Store.state.tasks.find(t => t.state === 'running' || t.state === 'paused');
+    if (!t) return;
+    UI.banner(`"${t.title}" was still on the clock - keep racing?`, [
+      ['Keep racing', () => { UI.flow = { stage: 'run', taskId: t.id }; UI.el('run-title').textContent = t.title; UI.el('run-par').textContent = 'par ' + U.mmss(t.parSec); UI.el('run-call').textContent = '🥊 ' + U.mmss(t.myCallSec); UI.renderStage(); }],
+      ['Drop it', () => UI.dropTask(t)],
+    ]);
+  },
+  showCorrupt(raw) {
+    UI.banner('Saved data could not be read. Export what is recoverable, then reset.', [
+      ['Download raw', () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([raw || ''], { type: 'application/json' })); a.download = 'product-madness-recovered.json'; a.click(); }],
+      ['Reset', () => { Store.save(); UI.banner(null); UI.renderAll(); }],
+    ]);
+  },
+  banner(msg, actions = []) {
+    const b = UI.el('banner');
+    if (!msg) { b.hidden = true; return; }
+    UI.el('banner-msg').textContent = msg;
+    const act = UI.el('banner-actions');
+    act.innerHTML = '';
+    for (const [label, fn] of actions) {
+      const btn = document.createElement('button');
+      btn.className = 'btn-minor'; btn.textContent = label;
+      btn.addEventListener('click', () => { b.hidden = true; fn(); });
+      act.appendChild(btn);
+    }
+    b.hidden = false;
+  },
+  toast(msg) {
+    const t = document.createElement('div');
+    t.className = 'toast'; t.textContent = msg;
+    UI.el('toasts').appendChild(t);
+    setTimeout(() => t.remove(), 2600);
+  },
+  rollover() {
+    const nowD = new Date();
+    const changed = Store.ensureDay(nowD) | Store.ensureWeek(nowD);
+    if (changed) { Store.save(); UI.renderAll(); }
+  },
+};
 
 // ===== SelfTest =====
 const SelfTest = {
