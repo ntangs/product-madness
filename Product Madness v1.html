@@ -135,9 +135,10 @@
                      background:var(--cream-surface); border-left:3px solid var(--pink-border); z-index:60;
                      padding:18px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
   #settings-drawer label { font-size:12px; font-weight:800; display:flex; flex-direction:column; gap:4px; }
-  #settings-drawer input[type=text], #settings-drawer input[type=password], #settings-drawer select {
+  #settings-drawer input[type=text], #settings-drawer input[type=password], #settings-drawer select, #settings-drawer textarea {
     background:#fff; border:2px solid var(--pink-border); border-radius:8px; padding:7px 9px;
     font-family:inherit; color:var(--body-text); }
+  #settings-drawer textarea { resize:vertical; }
   .drawer-note { font-size:11px; background:var(--cream-chip); border:1.5px dashed var(--chip-border);
                  border-radius:8px; padding:7px 9px; color:var(--mauve-text); }
   .switchrow { display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:800; }
@@ -229,7 +230,8 @@
       <option value="claude-haiku-4-5">claude-haiku-4-5 (fast, cheap)</option>
       <option value="claude-sonnet-5">claude-sonnet-5 (sharper)</option>
     </select></label>
-    <p class="drawer-note">Privacy: when the API is on, task titles are sent to Anthropic to estimate par. Keep member names and PHI out of task titles. The key stays in this browser only and is never included in exports.</p>
+    <label>My work context (helps the AI estimate)<textarea id="set-profile" rows="3" maxlength="600" placeholder="e.g. I coordinate projects: emails, scheduling, status docs, quick spreadsheet checks. Describe your typical micro-tasks."></textarea></label>
+    <p class="drawer-note">Privacy: when the API is on, task titles and your work context are sent to Anthropic to estimate par. Keep names and sensitive details out of both. The key stays in this browser only and is never included in exports.</p>
     <button id="btn-export" class="btn-minor">⬇ Export data (JSON)</button>
     <label class="btn-minor" style="text-align:center">⬆ Import data<input id="file-import" type="file" accept=".json" hidden></label>
     <button id="btn-reset" class="btn-minor">Reset everything</button>
@@ -301,7 +303,7 @@ const Rules = {
 const SEED_CATEGORIES = {
   'email-reply': { label: 'Email reply', emoji: '✉️', keywords: ['email', 'reply', 'respond', 'inbox'], baselineSec: 180, samples: [], archived: false },
   'chat-reply':  { label: 'Teams/chat reply', emoji: '💬', keywords: ['teams', 'chat', 'slack', 'message', 'ping'], baselineSec: 90, samples: [], archived: false },
-  'jira-comment':{ label: 'Jira comment', emoji: '🎫', keywords: ['jira comment', 'comment', 'acm-'], baselineSec: 150, samples: [], archived: false },
+  'jira-comment':{ label: 'Jira comment', emoji: '🎫', keywords: ['jira comment', 'comment'], baselineSec: 150, samples: [], archived: false },
   'jira-draft':  { label: 'Jira ticket draft', emoji: '📝', keywords: ['ticket', 'story', 'jira', 'draft'], baselineSec: 300, samples: [], archived: false },
   'grooming':    { label: 'Backlog grooming', emoji: '🧹', keywords: ['groom', 'backlog', 'triage'], baselineSec: 300, samples: [], archived: false },
   'wireframe':   { label: 'Wireframe edit', emoji: '🎨', keywords: ['wireframe', 'mockup', 'html'], baselineSec: 240, samples: [], archived: false },
@@ -402,7 +404,7 @@ const Store = {
       tasks: [],
       categories: JSON.parse(JSON.stringify(SEED_CATEGORIES)),
       quests: { date: Rules.dayKey(nowDate), items: Quests.forDate(Rules.dayKey(nowDate)) },
-      settings: { apiKey: '', apiEnabled: false, model: 'claude-haiku-4-5', sound: true, lastExportAt: null },
+      settings: { apiKey: '', apiEnabled: false, model: 'claude-haiku-4-5', sound: true, profile: '', lastExportAt: null },
     };
   },
   load(storage, nowDate) {
@@ -457,11 +459,12 @@ const Store = {
 };
 
 // ===== ApiClient =====
-const PM_PROFILE = 'The player is a senior product manager and business analyst at a healthcare technology company. Typical micro-tasks: replying to stakeholder emails and Teams messages, writing and grooming Jira tickets, editing HTML wireframes and mockups, cleaning up meeting notes, prepping agendas, and quick data checks in reports. They work fast and take pride in accurate estimates.';
+const DEFAULT_PROFILE = 'The player does fast-paced knowledge work: replying to emails and chat messages, writing and updating tickets or documents, small edits, scheduling, and quick data checks. They take pride in accurate estimates.';
 
-function SYSTEM_PROMPT(cat) {
+function SYSTEM_PROMPT(cat, profile) {
+  const who = (profile && profile.trim()) ? profile.trim().slice(0, 600) : DEFAULT_PROFILE;
   const med = cat.samples.length ? U.median(cat.samples.slice(-5)) + 's' : 'n/a';
-  return `You estimate how long the player's next micro-task will take, in seconds. You are their playful arcade rival: confident, teasing, never mean. ${PM_PROFILE}\nCategory "${cat.label}": baseline ${cat.baselineSec}s, ${cat.samples.length} recorded samples, recent median ${med}.\nRespond with ONLY a JSON object, no other text: {"seconds": <integer between 30 and 1200>, "quip": "<max 90 characters of playful trash talk about this estimate>"}`;
+  return `You estimate how long the player's next micro-task will take, in seconds. You are their playful arcade rival: confident, teasing, never mean. ${who}\nCategory "${cat.label}": baseline ${cat.baselineSec}s, ${cat.samples.length} recorded samples, recent median ${med}.\nRespond with ONLY a JSON object, no other text: {"seconds": <integer between 30 and 1200>, "quip": "<max 90 characters of playful trash talk about this estimate>"}`;
 }
 
 function USER_PROMPT(title, historyLines) {
@@ -488,7 +491,7 @@ const ApiClient = {
         },
         body: JSON.stringify({
           model: settings.model, max_tokens: 150,
-          system: SYSTEM_PROMPT(cat),
+          system: SYSTEM_PROMPT(cat, settings.profile),
           messages: [{ role: 'user', content: USER_PROMPT(title, historyLines) }],
         }),
       });
@@ -665,6 +668,7 @@ const UI = {
       UI.el('set-api-enabled').checked = s.apiEnabled;
       UI.el('set-api-key').value = s.apiKey;
       UI.el('set-model').value = s.model;
+      UI.el('set-profile').value = s.profile || '';
       UI.el('settings-drawer').hidden = false;
       UI.renderCatEditor();
     });
@@ -673,6 +677,7 @@ const UI = {
     UI.el('set-api-enabled').addEventListener('change', e => { Store.state.settings.apiEnabled = e.target.checked; Store.save(); });
     UI.el('set-api-key').addEventListener('change', e => { Store.state.settings.apiKey = e.target.value.trim(); Store.save(); });
     UI.el('set-model').addEventListener('change', e => { Store.state.settings.model = e.target.value; Store.save(); });
+    UI.el('set-profile').addEventListener('change', e => { Store.state.settings.profile = e.target.value.trim().slice(0, 600); Store.save(); });
     UI.el('btn-export').addEventListener('click', () => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([Store.exportJson()], { type: 'application/json' }));

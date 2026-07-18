@@ -117,7 +117,7 @@ Baked into the file, all editable in-app (rename, re-keyword, adjust baseline, a
 |---|---|---|
 | Email reply | email, reply, respond, inbox | 3:00 |
 | Teams/chat reply | teams, chat, slack, message, ping | 1:30 |
-| Jira comment | jira comment, comment, acm | 2:30 |
+| Jira comment | jira comment, comment | 2:30 |
 | Jira ticket draft | ticket, story, jira, draft ticket | 5:00 |
 | Backlog grooming pass | groom, backlog, triage | 5:00 |
 | Wireframe micro-edit | wireframe, mockup, html edit | 4:00 |
@@ -135,7 +135,7 @@ Baked into the file, all editable in-app (rename, re-keyword, adjust baseline, a
 
 - Settings drawer: paste Anthropic API key (stored only in localStorage), enable toggle, model picker (default `claude-haiku-4-5`; alternate `claude-sonnet-5`).
 - Request: `POST https://api.anthropic.com/v1/messages` with headers `x-api-key`, `anthropic-version: 2023-06-01`, `content-type: application/json`, `anthropic-dangerous-direct-browser-access: true`. `max_tokens: 150`.
-- System prompt contains: a one-paragraph baked-in profile of the player's role and typical work (PM/BA at a health-tech company: Jira tickets, wireframes, clinical program docs, stakeholder emails), the detected category's stats (baseline, sample count, median), the last 10 finished tasks in that category as `title - actual m:ss` lines, and strict output instructions.
+- System prompt contains: a one-paragraph profile of the player's role and typical work (user-editable in Settings as "My work context"; ships with a generic knowledge-work default), the detected category's stats (baseline, sample count, median), the last 10 finished tasks in that category as `title - actual m:ss` lines, and strict output instructions.
 - Expected response: a single JSON object `{"seconds": <int>, "quip": "<string, max 90 chars>"}`. Parse the first JSON object found; validate seconds as an integer in [30, 1200]; on any parse or validation failure, fall back to local silently.
 - Timeout 3.5 s, no retry (the game must feel instant); on timeout or error, local par is used.
 - The par chip always shows its source badge: a small "local" or "Claude" tag. Quips display at par reveal and on finish (win or lose flavor).
@@ -143,7 +143,7 @@ Baked into the file, all editable in-app (rename, re-keyword, adjust baseline, a
 
 ### 4.4 Privacy
 
-Task titles leave the machine only when the API toggle is on, and only to Anthropic's API. Standing rule for a healthcare workplace: no member names, no PHI in task titles. Settings shows this reminder next to the toggle. The API key never appears in exports (export strips `settings.apiKey`).
+Task titles and the work-context paragraph leave the machine only when the API toggle is on, and only to Anthropic's API. Standing rule: keep names and sensitive details out of both. Settings shows this reminder next to the toggle. The API key never appears in exports (export strips `settings.apiKey`).
 
 ## 5. Architecture
 

@@ -267,7 +267,7 @@ Create `Product Madness v1.html` with exactly this content:
       <option value="claude-haiku-4-5">claude-haiku-4-5 (fast, cheap)</option>
       <option value="claude-sonnet-5">claude-sonnet-5 (sharper)</option>
     </select></label>
-    <p class="drawer-note">Privacy: when the API is on, task titles are sent to Anthropic to estimate par. Keep member names and PHI out of task titles. The key stays in this browser only and is never included in exports.</p>
+    <p class="drawer-note">Privacy: when the API is on, task titles are sent to Anthropic to estimate par. Keep names and sensitive details out of task titles. The key stays in this browser only and is never included in exports.</p>
     <button id="btn-export" class="btn-minor">⬇ Export data (JSON)</button>
     <label class="btn-minor" style="text-align:center">⬆ Import data<input id="file-import" type="file" accept=".json" hidden></label>
     <button id="btn-reset" class="btn-minor">Reset everything</button>
@@ -529,7 +529,7 @@ Run the selftest command. Expected: nonzero failed count (`Estimator is not defi
 const SEED_CATEGORIES = {
   'email-reply': { label: 'Email reply', emoji: '✉️', keywords: ['email', 'reply', 'respond', 'inbox'], baselineSec: 180, samples: [], archived: false },
   'chat-reply':  { label: 'Teams/chat reply', emoji: '💬', keywords: ['teams', 'chat', 'slack', 'message', 'ping'], baselineSec: 90, samples: [], archived: false },
-  'jira-comment':{ label: 'Jira comment', emoji: '🎫', keywords: ['jira comment', 'comment', 'acm-'], baselineSec: 150, samples: [], archived: false },
+  'jira-comment':{ label: 'Jira comment', emoji: '🎫', keywords: ['jira comment', 'comment'], baselineSec: 150, samples: [], archived: false },
   'jira-draft':  { label: 'Jira ticket draft', emoji: '📝', keywords: ['ticket', 'story', 'jira', 'draft'], baselineSec: 300, samples: [], archived: false },
   'grooming':    { label: 'Backlog grooming', emoji: '🧹', keywords: ['groom', 'backlog', 'triage'], baselineSec: 300, samples: [], archived: false },
   'wireframe':   { label: 'Wireframe edit', emoji: '🎨', keywords: ['wireframe', 'mockup', 'html'], baselineSec: 240, samples: [], archived: false },
@@ -1474,7 +1474,7 @@ Run the selftest command. Expected: nonzero failed count (`ApiClient is not defi
 Fill `// ===== ApiClient =====`:
 
 ```js
-const PM_PROFILE = 'The player is a senior product manager and business analyst at a healthcare technology company. Typical micro-tasks: replying to stakeholder emails and Teams messages, writing and grooming Jira tickets, editing HTML wireframes and mockups, cleaning up meeting notes, prepping agendas, and quick data checks in reports. They work fast and take pride in accurate estimates.';
+const PM_PROFILE = 'The player does fast-paced knowledge work: replying to emails and chat messages, writing and updating tickets or documents, small edits, scheduling, and quick data checks. They take pride in accurate estimates.';
 
 function SYSTEM_PROMPT(cat) {
   const med = cat.samples.length ? U.median(cat.samples.slice(-5)) + 's' : 'n/a';
@@ -1737,7 +1737,7 @@ A personal arcade game for micro-tasks. Log a task, lock your call, race the AI'
 
 - Play: double-click `Product Madness.bat` (opens a chromeless game window), or open `Product Madness v1.html` in any browser.
 - Data lives in this browser's localStorage. Back up via Settings > Export.
-- Optional: paste an Anthropic API key in Settings for Claude-powered pars and trash talk. Keep member names and PHI out of task titles.
+- Optional: paste an Anthropic API key in Settings for Claude-powered pars and trash talk. Keep names and sensitive details out of task titles.
 - Self-test: open the file with `?selftest` appended to the URL.
 - Spec: `docs/superpowers/specs/2026-07-16-product-madness-design.md`
 ```
