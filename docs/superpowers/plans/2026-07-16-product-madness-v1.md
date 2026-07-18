@@ -501,8 +501,8 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 ```js
 SelfTest.suite(() => {
-  SelfTest.eq('detect: email keyword', Estimator.detectCategory('Reply to Kaitlin email', SEED_CATEGORIES), 'email-reply');
-  SelfTest.eq('detect: multi-word phrase', Estimator.detectCategory('follow up with Gildas', SEED_CATEGORIES), 'nudge');
+  SelfTest.eq('detect: email keyword', Estimator.detectCategory('Reply to Alex email', SEED_CATEGORIES), 'email-reply');
+  SelfTest.eq('detect: multi-word phrase', Estimator.detectCategory('follow up with Sam', SEED_CATEGORIES), 'nudge');
   SelfTest.eq('detect: no match falls to other', Estimator.detectCategory('water the plants', SEED_CATEGORIES), 'other');
   SelfTest.eq('detect: case-insensitive', Estimator.detectCategory('GROOM the backlog', SEED_CATEGORIES), 'grooming');
   const cat = (baselineSec, samples) => ({ baselineSec, samples, archived: false });
@@ -1171,7 +1171,7 @@ Expected: `1` (boot ran, idle stage active, no thrown error blanking the page)
 
 - [ ] **Step 4: Manual check (open the file in a browser)**
 
-Verify: type "reply to Kaitlin email" + Enter shows the call picker with the email chip suggested; lock call shows par reveal (badge "local"); Start runs the countdown; DONE fires star + XP toasts; a second task typed mid-run lands on the rail and can be started after; pause freezes the timer; drop clears without toasts of XP.
+Verify: type "reply to Alex email" + Enter shows the call picker with the email chip suggested; lock call shows par reveal (badge "local"); Start runs the countdown; DONE fires star + XP toasts; a second task typed mid-run lands on the rail and can be started after; pause freezes the timer; drop clears without toasts of XP.
 
 - [ ] **Step 5: Commit**
 

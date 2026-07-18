@@ -1143,8 +1143,8 @@ SelfTest.suite(() => {
 });
 
 SelfTest.suite(() => {
-  SelfTest.eq('detect: email keyword', Estimator.detectCategory('Reply to Kaitlin email', SEED_CATEGORIES), 'email-reply');
-  SelfTest.eq('detect: multi-word phrase', Estimator.detectCategory('follow up with Gildas', SEED_CATEGORIES), 'nudge');
+  SelfTest.eq('detect: email keyword', Estimator.detectCategory('Reply to Alex email', SEED_CATEGORIES), 'email-reply');
+  SelfTest.eq('detect: multi-word phrase', Estimator.detectCategory('follow up with Sam', SEED_CATEGORIES), 'nudge');
   SelfTest.eq('detect: no match falls to other', Estimator.detectCategory('water the plants', SEED_CATEGORIES), 'other');
   SelfTest.eq('detect: case-insensitive', Estimator.detectCategory('GROOM the backlog', SEED_CATEGORIES), 'grooming');
   const cat = (baselineSec, samples) => ({ baselineSec, samples, archived: false });
