@@ -133,7 +133,8 @@ Baked into the file, all editable in-app (rename, re-keyword, adjust baseline, a
 
 ### 4.3 Claude API layer (optional)
 
-- Settings drawer: paste Anthropic API key (stored only in localStorage), enable toggle, model picker (default `claude-haiku-4-5`; alternate `claude-sonnet-5`).
+- Settings drawer: paste Anthropic API key (stored only in localStorage), enable toggle, model picker (default `claude-haiku-4-5`; alternate `claude-sonnet-5`), and "My work context" paragraph feeding the estimator prompt.
+- First-run setup: a skippable 3-step in-game wizard (welcome and how-to, optional API key, work context) shows once for a fresh save (`settings.onboarded` false and zero tasks). Everything it collects lands in Settings, which remains the permanent home.
 - Request: `POST https://api.anthropic.com/v1/messages` with headers `x-api-key`, `anthropic-version: 2023-06-01`, `content-type: application/json`, `anthropic-dangerous-direct-browser-access: true`. `max_tokens: 150`.
 - System prompt contains: a one-paragraph profile of the player's role and typical work (user-editable in Settings as "My work context"; ships with a generic knowledge-work default), the detected category's stats (baseline, sample count, median), the last 10 finished tasks in that category as `title - actual m:ss` lines, and strict output instructions.
 - Expected response: a single JSON object `{"seconds": <int>, "quip": "<string, max 90 chars>"}`. Parse the first JSON object found; validate seconds as an integer in [30, 1200]; on any parse or validation failure, fall back to local silently.
@@ -177,7 +178,7 @@ Vanilla JS, no framework. Ordered sections, each a small module object: `Store` 
               "items": [ { "templateId": 1, "label": "", "target": 5,
                            "progress": 0, "done": false, "rewardXp": 40 } ] },
   "settings": { "apiKey": "", "apiEnabled": false, "model": "claude-haiku-4-5",
-                "sound": true, "lastExportAt": null }
+                "sound": true, "profile": "", "onboarded": false, "lastExportAt": null }
 }
 ```
 

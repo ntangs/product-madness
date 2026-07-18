@@ -128,6 +128,18 @@
   #levelup .card { background:var(--cream-surface); border:3px solid var(--pink-border); border-radius:20px;
                    padding:26px 30px; text-align:center; display:flex; flex-direction:column; gap:10px; align-items:center; }
   #levelup h2 { color:var(--strawberry); font-size:24px; }
+  #onboard { position:fixed; inset:0; background:rgba(126,88,101,.45); display:flex; align-items:center; justify-content:center; z-index:55; }
+  #onboard .card { background:var(--cream-surface); border:3px solid var(--pink-border); border-radius:20px; padding:24px 26px; width:340px; max-width:92vw; display:flex; flex-direction:column; gap:12px; }
+  #onboard h2 { color:var(--strawberry); font-size:22px; text-align:center; }
+  #onboard p { font-size:13px; line-height:1.5; }
+  #onboard .ob-step { display:none; flex-direction:column; gap:12px; }
+  #onboard .ob-step.on { display:flex; }
+  #onboard input, #onboard textarea { background:#fff; border:2px solid var(--pink-border); border-radius:8px; padding:8px 10px; font-family:inherit; color:var(--body-text); width:100%; }
+  #onboard textarea { resize:vertical; }
+  #onboard .ob-dots { display:flex; gap:6px; justify-content:center; }
+  #onboard .ob-dots i { width:8px; height:8px; border-radius:50%; background:var(--blush-minor); }
+  #onboard .ob-dots i.on { background:var(--rose-2); }
+  #onboard .ob-row { display:flex; gap:8px; justify-content:center; }
   #banner { position:fixed; top:0; left:0; right:0; background:linear-gradient(180deg,var(--blush-1),var(--blush-2));
             color:var(--hud-text); padding:10px 14px; z-index:45; display:flex; gap:10px; align-items:center;
             justify-content:center; flex-wrap:wrap; font-weight:700; font-size:13px; }
@@ -220,6 +232,28 @@
   </nav>
   <div id="toasts"></div>
   <div id="levelup" hidden><div class="card"><div class="stage-emoji">🎉</div><h2 id="levelup-title"></h2><p id="levelup-sub"></p><button id="levelup-ok" class="btn-primary">Back to the pass</button></div></div>
+  <div id="onboard" hidden><div class="card">
+    <div class="ob-step on" id="ob-step-1">
+      <h2>Welcome to the kitchen 🍓</h2>
+      <p>Log a real 1-5 minute work task, lock your own time estimate, then race the AI's par. Beat the clock for stars, chain combos, level up the brigade, and out-estimate your rival all week.</p>
+      <div class="ob-row"><button class="btn-primary" id="ob-next-1">Set up my rival</button></div>
+      <div class="ob-row"><button class="btn-ghost" id="ob-skip-all">skip - just let me cook</button></div>
+    </div>
+    <div class="ob-step" id="ob-step-2">
+      <h2>Your AI rival 🤖</h2>
+      <p>Optional: paste an Anthropic API key and the rival estimates with a real brain - and talks trash. Create one at console.anthropic.com. No key? The local estimator learns your pace from your own history, also great.</p>
+      <input id="ob-key" type="password" placeholder="sk-ant-... (optional)">
+      <p style="font-size:11px;opacity:.7">Stays in this browser only - never exported, never leaves except to Anthropic.</p>
+      <div class="ob-row"><button class="btn-minor" id="ob-back-2">back</button><button class="btn-primary" id="ob-next-2">Next</button></div>
+    </div>
+    <div class="ob-step" id="ob-step-3">
+      <h2>Tell it about your work 📝</h2>
+      <p>One paragraph about your typical micro-tasks makes estimates personal from day one. Optional - edit anytime in Settings.</p>
+      <textarea id="ob-profile" rows="3" maxlength="600" placeholder="e.g. I coordinate projects: emails, scheduling, status docs, quick spreadsheet checks."></textarea>
+      <div class="ob-row"><button class="btn-minor" id="ob-back-3">back</button><button class="btn-primary" id="ob-finish">LET'S COOK</button></div>
+    </div>
+    <div class="ob-dots"><i class="on"></i><i></i><i></i></div>
+  </div></div>
   <div id="banner" hidden><p id="banner-msg"></p><span id="banner-actions"></span></div>
   <aside id="settings-drawer" hidden>
     <h3 style="color:var(--hud-text)">Settings</h3>
@@ -404,7 +438,7 @@ const Store = {
       tasks: [],
       categories: JSON.parse(JSON.stringify(SEED_CATEGORIES)),
       quests: { date: Rules.dayKey(nowDate), items: Quests.forDate(Rules.dayKey(nowDate)) },
-      settings: { apiKey: '', apiEnabled: false, model: 'claude-haiku-4-5', sound: true, profile: '', lastExportAt: null },
+      settings: { apiKey: '', apiEnabled: false, model: 'claude-haiku-4-5', sound: true, profile: '', onboarded: false, lastExportAt: null },
     };
   },
   load(storage, nowDate) {
@@ -608,6 +642,7 @@ const UI = {
     UI.renderAll();
     UI.tickLoop();
     if (res.corrupt) UI.showCorrupt(res.raw);
+    if (UI.shouldOnboard(Store.state)) UI.el('onboard').hidden = false;
     UI.maybeRestore();
     setInterval(UI.rollover, 30000);
   },
@@ -660,6 +695,12 @@ const UI = {
     UI.el('btn-drop').addEventListener('click', () => { const t = UI.task(); if (t) UI.dropTask(t); });
     UI.el('call-slider').addEventListener('input', e => UI.setCall(Number(e.target.value)));
     UI.el('levelup-ok').addEventListener('click', () => { UI.el('levelup').hidden = true; });
+    UI.el('ob-next-1').addEventListener('click', () => UI.obStep(2));
+    UI.el('ob-next-2').addEventListener('click', () => UI.obStep(3));
+    UI.el('ob-back-2').addEventListener('click', () => UI.obStep(1));
+    UI.el('ob-back-3').addEventListener('click', () => UI.obStep(2));
+    UI.el('ob-skip-all').addEventListener('click', () => { Store.state.settings.onboarded = true; Store.save(); UI.el('onboard').hidden = true; UI.el('quick-log').focus(); });
+    UI.el('ob-finish').addEventListener('click', UI.finishOnboard);
     UI.el('tab-kitchen').addEventListener('click', () => UI.switchTab('kitchen'));
     UI.el('tab-progress').addEventListener('click', () => UI.switchTab('progress'));
     UI.el('settings-open').addEventListener('click', () => {
@@ -744,6 +785,22 @@ const UI = {
     UI.el('call-value').textContent = U.mmss(sec);
     document.querySelectorAll('#call-chips button').forEach(b =>
       b.classList.toggle('on', Number(b.dataset.sec) === sec));
+  },
+  shouldOnboard(state) { return !state.settings.onboarded && state.tasks.length === 0; },
+  obStep(n) {
+    [1, 2, 3].forEach(i => UI.el('ob-step-' + i).classList.toggle('on', i === n));
+    document.querySelectorAll('#onboard .ob-dots i').forEach((d, i) => d.classList.toggle('on', i === n - 1));
+  },
+  finishOnboard() {
+    const s = Store.state.settings;
+    const key = UI.el('ob-key').value.trim();
+    if (key) { s.apiKey = key; s.apiEnabled = true; }
+    s.profile = UI.el('ob-profile').value.trim().slice(0, 600);
+    s.onboarded = true;
+    Store.save();
+    UI.el('onboard').hidden = true;
+    UI.toast('🍓 kitchen is yours - Settings holds all of this later');
+    UI.el('quick-log').focus();
   },
   syncCatChip(task) {
     const chip = UI.el('quick-cat');
@@ -1252,6 +1309,12 @@ SelfTest.suite(async () => {
   const cached = await ApiClient.par('reply to Bob', cat, [], settings, '2026-07-16', throwFetch);
   SelfTest.eq('api: same-day cache hit skips fetch', cached.seconds, 240);
   SelfTest.ok('api: quip capped at 90 chars', (await (async () => { const long = async () => ({ ok: true, json: async () => ({ content: [{ type: 'text', text: `{"seconds":120,"quip":"${'x'.repeat(200)}"}` }] }) }); return ApiClient.par('t5', cat, [], settings, '2026-07-16', long); })()).quip.length === 90);
+});
+
+SelfTest.suite(() => {
+  SelfTest.eq('onboard: fresh player sees setup', UI.shouldOnboard({ settings: { onboarded: false }, tasks: [] }), true);
+  SelfTest.eq('onboard: completed flag suppresses', UI.shouldOnboard({ settings: { onboarded: true }, tasks: [] }), false);
+  SelfTest.eq('onboard: existing history suppresses', UI.shouldOnboard({ settings: { onboarded: false }, tasks: [{}] }), false);
 });
 
 // ===== Boot =====

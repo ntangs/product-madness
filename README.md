@@ -12,7 +12,7 @@ A Cooking Madness-style arcade game for 1-5 minute work tasks. Log a micro-task,
 
 ## Make it yours
 
-Everything personal lives in YOUR browser (localStorage) - never in this repo:
+**First launch walks you through this** - a skippable 3-step in-game setup asks for your (optional) API key and work context. Everything personal lives in YOUR browser (localStorage) - never in this repo:
 
 1. **Settings** (Progress tab, gear at the bottom): paste your own Anthropic API key for AI pars and trash talk. Optional - the local estimator works fine without it.
 2. **My work context**: write one paragraph about your typical micro-tasks in Settings. The AI uses it to estimate like it knows your job.
