@@ -140,6 +140,7 @@
   #onboard .ob-dots i { width:8px; height:8px; border-radius:50%; background:var(--blush-minor); }
   #onboard .ob-dots i.on { background:var(--rose-2); }
   #onboard .ob-row { display:flex; gap:8px; justify-content:center; }
+  .ob-prov.on { background:linear-gradient(180deg,var(--tab-1),var(--tab-2)); color:#fff; }
   #banner { position:fixed; top:0; left:0; right:0; background:linear-gradient(180deg,var(--blush-1),var(--blush-2));
             color:var(--hud-text); padding:10px 14px; z-index:45; display:flex; gap:10px; align-items:center;
             justify-content:center; flex-wrap:wrap; font-weight:700; font-size:13px; }
@@ -241,9 +242,14 @@
     </div>
     <div class="ob-step" id="ob-step-2">
       <h2>Your AI rival 🤖</h2>
-      <p>Optional: paste an Anthropic API key and the rival estimates with a real brain - and talks trash. Create one at console.anthropic.com. No key? The local estimator learns your pace from your own history, also great.</p>
-      <input id="ob-key" type="password" placeholder="sk-ant-... (optional)">
-      <p style="font-size:11px;opacity:.7">Stays in this browser only - never exported, never leaves except to Anthropic.</p>
+      <p>Optional: give the rival a real brain - it estimates smarter and talks trash. Pick a provider; no key at all is fine too (the local estimator learns your pace from your own history).</p>
+      <div class="ob-row">
+        <button class="btn-minor ob-prov" data-prov="google">Gemini (free tier)</button>
+        <button class="btn-minor ob-prov" data-prov="anthropic">Claude (pay-as-you-go)</button>
+      </div>
+      <p id="ob-key-hint" style="font-size:11px;opacity:.8"></p>
+      <input id="ob-key" type="password" placeholder="paste a key (optional)">
+      <p style="font-size:11px;opacity:.7">Stays in this browser only - never exported, never sent anywhere except your chosen provider.</p>
       <div class="ob-row"><button class="btn-minor" id="ob-back-2">back</button><button class="btn-primary" id="ob-next-2">Next</button></div>
     </div>
     <div class="ob-step" id="ob-step-3">
@@ -258,14 +264,16 @@
   <aside id="settings-drawer" hidden>
     <h3 style="color:var(--hud-text)">Settings</h3>
     <div class="switchrow"><span>Sound</span><input id="set-sound" type="checkbox" checked></div>
-    <div class="switchrow"><span>Claude API estimates</span><input id="set-api-enabled" type="checkbox"></div>
-    <label>Anthropic API key<input id="set-api-key" type="password" placeholder="sk-ant-..."></label>
-    <label>Model<select id="set-model">
-      <option value="claude-haiku-4-5">claude-haiku-4-5 (fast, cheap)</option>
-      <option value="claude-sonnet-5">claude-sonnet-5 (sharper)</option>
+    <div class="switchrow"><span>AI estimates</span><input id="set-api-enabled" type="checkbox"></div>
+    <label>AI provider<select id="set-provider">
+      <option value="google">Gemini (Google) - has a free tier</option>
+      <option value="anthropic">Claude (Anthropic) - pay-as-you-go</option>
     </select></label>
+    <label>API key<input id="set-api-key" type="password" placeholder="paste a key"></label>
+    <p id="set-key-hint" class="drawer-note" style="margin-top:-6px"></p>
+    <label>Model<select id="set-model"></select></label>
     <label>My work context (helps the AI estimate)<textarea id="set-profile" rows="3" maxlength="600" placeholder="e.g. I coordinate projects: emails, scheduling, status docs, quick spreadsheet checks. Describe your typical micro-tasks."></textarea></label>
-    <p class="drawer-note">Privacy: when the API is on, task titles and your work context are sent to Anthropic to estimate par. Keep names and sensitive details out of both. The key stays in this browser only and is never included in exports.</p>
+    <p class="drawer-note">Privacy: when AI estimates are on, task titles and your work context are sent to your chosen provider to estimate par. On Google's free tier, content may be used to improve Google's products. Keep names and sensitive details out of both. The key stays in this browser only and is never included in exports.</p>
     <button id="btn-export" class="btn-minor">⬇ Export data (JSON)</button>
     <label class="btn-minor" style="text-align:center">⬆ Import data<input id="file-import" type="file" accept=".json" hidden></label>
     <button id="btn-reset" class="btn-minor">Reset everything</button>
@@ -438,7 +446,7 @@ const Store = {
       tasks: [],
       categories: JSON.parse(JSON.stringify(SEED_CATEGORIES)),
       quests: { date: Rules.dayKey(nowDate), items: Quests.forDate(Rules.dayKey(nowDate)) },
-      settings: { apiKey: '', apiEnabled: false, model: 'claude-haiku-4-5', sound: true, profile: '', onboarded: false, lastExportAt: null },
+      settings: { apiKey: '', apiEnabled: false, provider: 'google', model: 'gemini-2.5-flash-lite', sound: true, profile: '', onboarded: false, lastExportAt: null },
     };
   },
   load(storage, nowDate) {
@@ -505,33 +513,64 @@ function USER_PROMPT(title, historyLines) {
   return `Task: "${title}"\nRecent similar tasks (actual times):\n${historyLines.length ? historyLines.join('\n') : '(none yet)'}`;
 }
 
+const PROVIDERS = {
+  anthropic: { label: 'Claude', models: ['claude-haiku-4-5', 'claude-sonnet-5'],
+    keyHint: 'sk-ant-... key from console.anthropic.com (pay-as-you-go, pennies with a spend cap)',
+    placeholder: 'sk-ant-... (optional)' },
+  google: { label: 'Gemini', models: ['gemini-2.5-flash-lite', 'gemini-2.5-flash'],
+    keyHint: 'AIza... key free at aistudio.google.com/apikey - free tier allows 1000 estimates/day; Google may use free-tier content to improve its products',
+    placeholder: 'AIza... (optional, free tier)' },
+};
+function providerOf(settings) { return PROVIDERS[settings.provider] ? settings.provider : 'anthropic'; }
+
 const ApiClient = {
   cache: {},
   failStreak: 0,
   async par(title, cat, historyLines, settings, dayKey, fetchFn = fetch) {
-    const ck = dayKey + '|' + title.toLowerCase();
+    const prov = providerOf(settings);
+    const ck = dayKey + '|' + prov + '|' + title.toLowerCase();
     if (ApiClient.cache[ck]) return ApiClient.cache[ck];
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 3500);
     try {
-      const res = await fetchFn('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        signal: ctrl.signal,
-        headers: {
-          'x-api-key': settings.apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: settings.model, max_tokens: 150,
-          system: SYSTEM_PROMPT(cat, settings.profile),
-          messages: [{ role: 'user', content: USER_PROMPT(title, historyLines) }],
-        }),
-      });
+      let res;
+      if (prov === 'google') {
+        res = await fetchFn('https://generativelanguage.googleapis.com/v1beta/models/' + settings.model + ':generateContent', {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': settings.apiKey },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: SYSTEM_PROMPT(cat, settings.profile) }] },
+            contents: [{ role: 'user', parts: [{ text: USER_PROMPT(title, historyLines) }] }],
+            generationConfig: { maxOutputTokens: 300, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+          }),
+        });
+      } else {
+        res = await fetchFn('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: {
+            'x-api-key': settings.apiKey,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify({
+            model: settings.model, max_tokens: 150,
+            system: SYSTEM_PROMPT(cat, settings.profile),
+            messages: [{ role: 'user', content: USER_PROMPT(title, historyLines) }],
+          }),
+        });
+      }
       if (!res.ok) throw new Error('http ' + res.status);
       const data = await res.json();
-      const text = (data.content || []).map(b => b.text || '').join('');
+      let text;
+      if (prov === 'google') {
+        const cand = (data.candidates || [])[0];
+        text = (((cand || {}).content || {}).parts || []).map(p => p.text || '').join('');
+      } else {
+        text = (data.content || []).map(b => b.text || '').join('');
+      }
       const m = text.match(/\{[\s\S]*\}/);
       if (!m) throw new Error('no json');
       const obj = JSON.parse(m[0]);
@@ -708,7 +747,8 @@ const UI = {
       UI.el('set-sound').checked = s.sound;
       UI.el('set-api-enabled').checked = s.apiEnabled;
       UI.el('set-api-key').value = s.apiKey;
-      UI.el('set-model').value = s.model;
+      UI.el('set-provider').value = providerOf(s);
+      UI.syncProviderUI();
       UI.el('set-profile').value = s.profile || '';
       UI.el('settings-drawer').hidden = false;
       UI.renderCatEditor();
@@ -717,7 +757,16 @@ const UI = {
     UI.el('set-sound').addEventListener('change', e => { Store.state.settings.sound = e.target.checked; Store.save(); });
     UI.el('set-api-enabled').addEventListener('change', e => { Store.state.settings.apiEnabled = e.target.checked; Store.save(); });
     UI.el('set-api-key').addEventListener('change', e => { Store.state.settings.apiKey = e.target.value.trim(); Store.save(); });
+    UI.el('set-provider').addEventListener('change', e => {
+      const s = Store.state.settings;
+      s.provider = e.target.value;
+      s.model = PROVIDERS[s.provider].models[0];
+      Store.save();
+      UI.syncProviderUI();
+    });
     UI.el('set-model').addEventListener('change', e => { Store.state.settings.model = e.target.value; Store.save(); });
+    document.querySelectorAll('.ob-prov').forEach(b => b.addEventListener('click', () => UI.obSetProv(b.dataset.prov)));
+    UI.obSetProv('google');
     UI.el('set-profile').addEventListener('change', e => { Store.state.settings.profile = e.target.value.trim().slice(0, 600); Store.save(); });
     UI.el('btn-export').addEventListener('click', () => {
       const a = document.createElement('a');
@@ -787,6 +836,27 @@ const UI = {
       b.classList.toggle('on', Number(b.dataset.sec) === sec));
   },
   shouldOnboard(state) { return !state.settings.onboarded && state.tasks.length === 0; },
+  _obProv: 'google',
+  obSetProv(prov) {
+    UI._obProv = PROVIDERS[prov] ? prov : 'google';
+    document.querySelectorAll('.ob-prov').forEach(b => b.classList.toggle('on', b.dataset.prov === UI._obProv));
+    UI.el('ob-key-hint').textContent = PROVIDERS[UI._obProv].keyHint;
+    UI.el('ob-key').placeholder = PROVIDERS[UI._obProv].placeholder;
+  },
+  syncProviderUI() {
+    const s = Store.state.settings;
+    const prov = providerOf(s);
+    const sel = UI.el('set-model');
+    sel.innerHTML = '';
+    for (const m of PROVIDERS[prov].models) {
+      const o = document.createElement('option');
+      o.value = m; o.textContent = m;
+      sel.appendChild(o);
+    }
+    sel.value = PROVIDERS[prov].models.includes(s.model) ? s.model : PROVIDERS[prov].models[0];
+    UI.el('set-api-key').placeholder = PROVIDERS[prov].placeholder;
+    UI.el('set-key-hint').textContent = PROVIDERS[prov].keyHint;
+  },
   obStep(n) {
     [1, 2, 3].forEach(i => UI.el('ob-step-' + i).classList.toggle('on', i === n));
     document.querySelectorAll('#onboard .ob-dots i').forEach((d, i) => d.classList.toggle('on', i === n - 1));
@@ -794,7 +864,7 @@ const UI = {
   finishOnboard() {
     const s = Store.state.settings;
     const key = UI.el('ob-key').value.trim();
-    if (key) { s.apiKey = key; s.apiEnabled = true; }
+    if (key) { s.apiKey = key; s.apiEnabled = true; s.provider = UI._obProv; s.model = PROVIDERS[UI._obProv].models[0]; }
     s.profile = UI.el('ob-profile').value.trim().slice(0, 600);
     s.onboarded = true;
     Store.save();
@@ -834,10 +904,10 @@ const UI = {
         .map(t => `${t.title} - ${U.mmss(t.actualSec)}`);
       const api = await ApiClient.par(task.title, cat, historyLines, s, Rules.dayKey(new Date()));
       if (api && task.state === 'queued') { task.parSec = api.seconds; task.parSource = 'api'; task.quip = api.quip; }
-      else if (!api && ApiClient.failStreak >= 3) UI.toast('Claude is napping - local pars for now');
+      else if (!api && ApiClient.failStreak >= 3) UI.toast(PROVIDERS[providerOf(s)].label + ' is napping - local pars for now');
     }
     UI.el('ready-par').textContent = U.mmss(task.parSec);
-    UI.el('ready-par-src').textContent = task.parSource === 'api' ? 'Claude' : 'local';
+    UI.el('ready-par-src').textContent = task.parSource === 'api' ? PROVIDERS[providerOf(Store.state.settings)].label : 'local';
     UI.el('ready-quip').textContent = task.quip;
   },
 
@@ -1309,6 +1379,20 @@ SelfTest.suite(async () => {
   const cached = await ApiClient.par('reply to Bob', cat, [], settings, '2026-07-16', throwFetch);
   SelfTest.eq('api: same-day cache hit skips fetch', cached.seconds, 240);
   SelfTest.ok('api: quip capped at 90 chars', (await (async () => { const long = async () => ({ ok: true, json: async () => ({ content: [{ type: 'text', text: `{"seconds":120,"quip":"${'x'.repeat(200)}"}` }] }) }); return ApiClient.par('t5', cat, [], settings, '2026-07-16', long); })()).quip.length === 90);
+});
+
+SelfTest.suite(async () => {
+  const gSettings = { apiKey: 'k', apiEnabled: true, model: 'gemini-2.5-flash-lite', provider: 'google' };
+  const cat = { label: 'Email reply', baselineSec: 180, samples: [] };
+  ApiClient.cache = {}; ApiClient.failStreak = 0;
+  const gOk = async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"seconds":180,"quip":"Gemini says go."}' }] } }] }) });
+  const g = await ApiClient.par('gm1', cat, [], gSettings, '2026-07-19', gOk);
+  SelfTest.eq('gemini: parses seconds and quip', [g.seconds, g.quip], [180, 'Gemini says go.']);
+  const gParts = async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"seconds":120,' }, { text: '"quip":"split"}' }] } }] }) });
+  SelfTest.eq('gemini: joins multi-part text', (await ApiClient.par('gm2', cat, [], gSettings, '2026-07-19', gParts)).seconds, 120);
+  const gEmpty = async () => ({ ok: true, json: async () => ({ candidates: [] }) });
+  SelfTest.eq('gemini: empty candidates rejected', await ApiClient.par('gm3', cat, [], gSettings, '2026-07-19', gEmpty), null);
+  SelfTest.eq('gemini: cache keys are provider-scoped', ApiClient.cache['2026-07-19|google|gm1'].seconds, 180);
 });
 
 SelfTest.suite(() => {
